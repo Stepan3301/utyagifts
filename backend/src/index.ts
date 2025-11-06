@@ -39,11 +39,10 @@ app.use((req, res) => {
 });
 
 // Initialize Telegram bot
-try {
-  telegramService.initialize();
-} catch (error) {
+telegramService.initialize().catch((error) => {
   console.error('Failed to initialize Telegram bot:', error);
-}
+  process.exit(1);
+});
 
 app.listen(PORT, () => {
   console.log(`🚀 Server running on port ${PORT}`);

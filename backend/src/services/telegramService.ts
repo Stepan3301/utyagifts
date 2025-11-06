@@ -4,30 +4,38 @@ import { userRepository } from '../repositories/userRepository';
 
 class TelegramService {
   private bot: TelegramBot | null = null;
+  private botToken: string | null = null;
 
   /**
    * Initialize Telegram bot
    */
-  initialize(): void {
+  async initialize(): Promise<void> {
     const token = process.env.TELEGRAM_BOT_TOKEN;
     if (!token) {
       throw new Error('TELEGRAM_BOT_TOKEN is not set');
     }
 
-    this.bot = new TelegramBot(token);
+    this.botToken = token;
+    this.bot = new TelegramBot(token, { polling: false });
 
     // Set webhook if WEBHOOK_URL is provided
     const webhookUrl = process.env.TELEGRAM_WEBHOOK_URL;
     if (webhookUrl) {
-      this.bot.setWebHook(webhookUrl);
+      await this.bot.setWebHook(webhookUrl);
       console.log('📡 Webhook set to:', webhookUrl);
     } else {
       // Polling mode for development
-      this.bot.startPolling();
+      await this.bot.startPolling({
+        polling: {
+          interval: 300,
+          autoStart: true,
+        },
+      });
       console.log('🔄 Bot started in polling mode');
     }
 
     this.setupHandlers();
+    await this.setupMenuButton();
   }
 
   /**
@@ -37,21 +45,26 @@ class TelegramService {
     if (!this.bot) return;
 
     this.bot.onText(/\/start/, async (msg) => {
-      const chatId = msg.chat.id;
-      const webappUrl = process.env.WEBAPP_URL || 'https://your-domain.com/app';
+      try {
+        const chatId = msg.chat.id;
+        const webappUrl = process.env.WEBAPP_URL || process.env.NEXT_PUBLIC_API_BASE_URL?.replace('/api', '') || 'http://localhost:3000';
 
-      await this.bot!.sendMessage(chatId, 'Welcome to Rocket Gifts! 🚀', {
-        reply_markup: {
-          inline_keyboard: [
-            [
-              {
-                text: '🎮 Open Game',
-                web_app: { url: webappUrl },
-              },
+        await this.bot!.sendMessage(chatId, 'Welcome to Rocket Gifts! 🚀\n\nTap the menu button below to launch the game!', {
+          reply_markup: {
+            inline_keyboard: [
+              [
+                {
+                  text: '🎮 Launch Game',
+                  web_app: { url: webappUrl },
+                },
+              ],
             ],
-          ],
-        },
-      });
+          },
+        });
+        console.log(`✅ Responded to /start from user ${msg.from?.id}`);
+      } catch (error) {
+        console.error('Error handling /start command:', error);
+      }
     });
 
     // Handle gift updates (when user sends gift to relayer)
@@ -61,6 +74,43 @@ class TelegramService {
         await this.handleGiftReceived(msg);
       }
     });
+
+    // Error handling
+    this.bot.on('error', (error) => {
+      console.error('Telegram bot error:', error);
+    });
+
+    this.bot.on('polling_error', (error) => {
+      console.error('Telegram polling error:', error);
+    });
+  }
+
+  /**
+   * Setup persistent menu button (Launch App button in chat header)
+   * Uses Telegram Bot API directly via request method
+   */
+  private async setupMenuButton(): Promise<void> {
+    if (!this.bot || !this.botToken) return;
+
+    try {
+      const webappUrl = process.env.WEBAPP_URL || process.env.NEXT_PUBLIC_API_BASE_URL?.replace('/api', '') || 'http://localhost:3000';
+      
+      // Use bot's request method to call setChatMenuButton API
+      // This sets the menu button globally for all users
+      await this.bot.request('setChatMenuButton', {
+        menu_button: {
+          type: 'web_app',
+          text: '🚀 Launch App',
+          web_app: {
+            url: webappUrl,
+          },
+        },
+      });
+      console.log('✅ Menu button set successfully:', webappUrl);
+    } catch (error: any) {
+      console.error('Error setting menu button:', error.message || error);
+      // Don't throw - menu button is optional, might fail if bot doesn't have permission
+    }
   }
 
   /**
@@ -68,7 +118,7 @@ class TelegramService {
    */
   async processUpdate(update: any): Promise<void> {
     if (!this.bot) {
-      this.initialize();
+      await this.initialize();
     }
 
     // Process the update
