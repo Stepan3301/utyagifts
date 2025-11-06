@@ -1,0 +1,31 @@
+{
+  "name": "rocket-gifts",
+  "version": "1.0.0",
+  "description": "Telegram Mini App + Bot for crash-rocket-style game with Telegram gifts",
+  "private": true,
+  "workspaces": [
+    "frontend",
+    "backend"
+  ],
+  "scripts": {
+    "dev": "pnpm run --parallel dev",
+    "build": "pnpm run --recursive build",
+    "lint": "pnpm run --recursive lint",
+    "type-check": "pnpm run --recursive type-check"
+  },
+  "keywords": [
+    "telegram",
+    "miniapp",
+    "bot",
+    "crash-game",
+    "gifts"
+  ],
+  "author": "",
+  "license": "MIT",
+  "engines": {
+    "node": ">=20.0.0",
+    "pnpm": ">=8.0.0"
+  },
+  "packageManager": "pnpm@8.15.0"
+}
+
