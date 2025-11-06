@@ -1,4 +1,4 @@
-# Rocket Gifts 🚀
+# Utya Gifts 🚀
 
 A crash-rocket-style game where users play for Telegram gifts (NFT-like objects).
 
