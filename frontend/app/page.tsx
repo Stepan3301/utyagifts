@@ -36,6 +36,7 @@ export default function Home() {
   const [sessionState, setSessionState] = useState<SessionState>('idle')
   const [currentMultiplier, setCurrentMultiplier] = useState(1)
   const [targetCrashMultiplier, setTargetCrashMultiplier] = useState<number | null>(null)
+  const [collectedMultiplier, setCollectedMultiplier] = useState<number | null>(null)
   const animationRef = useRef<LottieRefCurrentProps>(null)
   const crashTargetRef = useRef<number>(10)
 
@@ -68,13 +69,16 @@ export default function Home() {
   const gameAreaBackgroundClass = useMemo(() => {
     switch (sessionState) {
       case 'running':
+        if (collectedMultiplier !== null) {
+          return 'bg-gradient-to-b from-[#1a3a4a] via-[#2a4a5a] to-[#1a2a3a]'
+        }
         return 'bg-gradient-to-b from-[#052914] via-[#0A4F2B] to-[#042414]'
       case 'crashed':
         return 'bg-gradient-to-b from-[#2B0508] via-[#5A0F19] to-[#1A0408]'
       default:
         return 'bg-white/5'
     }
-  }, [sessionState])
+  }, [collectedMultiplier, sessionState])
 
   const displayedMultiplier = useMemo(() => {
     if (sessionState === 'idle') {
@@ -92,15 +96,18 @@ export default function Home() {
   const sessionMessage = useMemo(() => {
     switch (sessionState) {
       case 'running':
+        if (collectedMultiplier !== null) {
+          return `You collected at ${collectedMultiplier.toFixed(2)}x - Watching rocket...`
+        }
         return `Live multiplier: ${currentMultiplier.toFixed(2)}x`
       case 'cashed':
-        return `You collected at ${currentMultiplier.toFixed(2)}x`
+        return `You collected at ${collectedMultiplier?.toFixed(2)}x - Rocket crashed at ${(targetCrashMultiplier ?? currentMultiplier).toFixed(2)}x`
       case 'crashed':
         return `Rocket crashed at ${(targetCrashMultiplier ?? currentMultiplier).toFixed(2)}x`
       default:
         return 'Ready for launch'
     }
-  }, [currentMultiplier, sessionState, targetCrashMultiplier])
+  }, [collectedMultiplier, currentMultiplier, sessionState, targetCrashMultiplier])
 
   const players = useMemo(
     () => [
@@ -109,21 +116,25 @@ export default function Home() {
       {
         name: 'You',
         amount:
-          sessionState === 'running' || sessionState === 'cashed' || sessionState === 'crashed'
-            ? `${currentMultiplier.toFixed(2)}x`
-            : '—',
+          sessionState === 'running' && collectedMultiplier !== null
+            ? `${collectedMultiplier.toFixed(2)}x`
+            : sessionState === 'running' || sessionState === 'cashed' || sessionState === 'crashed'
+              ? `${currentMultiplier.toFixed(2)}x`
+              : '—',
         icon: '🧑',
         status:
-          sessionState === 'running'
-            ? 'Live'
-            : sessionState === 'cashed'
-              ? 'Collected'
-              : sessionState === 'crashed'
-                ? 'Crashed'
-                : 'Ready',
+          sessionState === 'running' && collectedMultiplier !== null
+            ? 'Collected'
+            : sessionState === 'running'
+              ? 'Live'
+              : sessionState === 'cashed'
+                ? 'Collected'
+                : sessionState === 'crashed'
+                  ? 'Crashed'
+                  : 'Ready',
       },
     ],
-    [currentMultiplier, sessionState]
+    [collectedMultiplier, currentMultiplier, sessionState]
   )
 
   const handleLaunch = useCallback(() => {
@@ -134,6 +145,7 @@ export default function Home() {
 
     setTargetCrashMultiplier(crashPoint)
     setCurrentMultiplier(1)
+    setCollectedMultiplier(null)
     setSessionState('running')
 
     if (animationRef.current) {
@@ -142,10 +154,10 @@ export default function Home() {
   }, [sessionState])
 
   const handleCollect = useCallback(() => {
-    if (sessionState !== 'running') return
+    if (sessionState !== 'running' || collectedMultiplier !== null) return
 
-    setSessionState('cashed')
-  }, [sessionState])
+    setCollectedMultiplier(currentMultiplier)
+  }, [collectedMultiplier, currentMultiplier, sessionState])
 
   useEffect(() => {
     if (sessionState === 'running') {
@@ -225,12 +237,14 @@ export default function Home() {
           ? 'Replay'
           : 'Launch'
   const collectLabel =
-    sessionState === 'running'
-      ? `Collect ${currentMultiplier.toFixed(2)}x`
-      : sessionState === 'cashed'
-        ? 'Collected'
-        : 'Collect'
-  const collectDisabled = sessionState !== 'running'
+    sessionState === 'running' && collectedMultiplier !== null
+      ? `Collected at ${collectedMultiplier.toFixed(2)}x`
+      : sessionState === 'running'
+        ? `Collect ${currentMultiplier.toFixed(2)}x`
+        : sessionState === 'cashed'
+          ? 'Collected'
+          : 'Collect'
+  const collectDisabled = sessionState !== 'running' || collectedMultiplier !== null
 
   if (!mounted) {
     return (
