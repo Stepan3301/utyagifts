@@ -14,7 +14,18 @@ const NAV_ITEMS = [
   { label: 'Profile', icon: '👤' },
 ]
 
-const DEFAULT_MULTIPLIERS = ['1.20x', '2.40x', '6.00x', '10.00x']
+const STARFIELD = [
+  { top: '12%', left: '18%', size: 4, opacity: 0.85, blur: 18, duration: 3.8, delay: 0 },
+  { top: '28%', left: '68%', size: 3, opacity: 0.6, blur: 14, duration: 4.6, delay: 0.6 },
+  { top: '48%', left: '12%', size: 2, opacity: 0.7, blur: 10, duration: 5.4, delay: 1.1 },
+  { top: '70%', left: '30%', size: 3, opacity: 0.65, blur: 16, duration: 4.2, delay: 1.7 },
+  { top: '78%', left: '72%', size: 4, opacity: 0.75, blur: 22, duration: 3.4, delay: 0.4 },
+  { top: '18%', left: '82%', size: 2, opacity: 0.55, blur: 12, duration: 5.8, delay: 1.9 },
+  { top: '62%', left: '56%', size: 3, opacity: 0.7, blur: 15, duration: 4.8, delay: 1.2 },
+  { top: '38%', left: '42%', size: 2, opacity: 0.6, blur: 9, duration: 5.1, delay: 0.9 },
+  { top: '86%', left: '44%', size: 3, opacity: 0.8, blur: 18, duration: 4.1, delay: 0.3 },
+  { top: '8%', left: '52%', size: 2, opacity: 0.7, blur: 11, duration: 6.2, delay: 1.5 },
+]
 const MAX_MULTIPLIER = 20
 
 type SessionState = 'idle' | 'running' | 'cashed' | 'crashed'
@@ -50,22 +61,32 @@ export default function Home() {
 
   const gradientOverlay = useMemo(
     () =>
-      'before:pointer-events-none before:absolute before:inset-0 before:bg-[radial-gradient(circle_at_top,rgba(96,165,250,0.35),transparent_60%),radial-gradient(circle_at_bottom,rgba(250,204,21,0.15),transparent_55%)] before:opacity-80',
+      'before:pointer-events-none before:absolute before:inset-0 before:bg-[radial-gradient(circle_at_top,rgba(99,102,241,0.35),transparent_65%),radial-gradient(circle_at_bottom,rgba(236,72,153,0.2),transparent_55%)] before:opacity-80',
     []
   )
 
-  const displayedMultipliers = useMemo(() => {
+  const backgroundClass = useMemo(() => {
+    switch (sessionState) {
+      case 'running':
+        return 'bg-gradient-to-b from-[#052914] via-[#0A4F2B] to-[#042414]'
+      case 'crashed':
+        return 'bg-gradient-to-b from-[#2B0508] via-[#5A0F19] to-[#1A0408]'
+      default:
+        return 'bg-gradient-to-b from-[#050015] via-[#09002F] to-[#01010A]'
+    }
+  }, [sessionState])
+
+  const displayedMultiplier = useMemo(() => {
     if (sessionState === 'idle') {
-      return DEFAULT_MULTIPLIERS
+      return '1.00x'
     }
 
-    const progressValue = Math.min(currentMultiplier, targetCrashMultiplier ?? 10, MAX_MULTIPLIER)
-    const ratios = [0.35, 0.55, 0.75, 1]
+    const value =
+      sessionState === 'running'
+        ? currentMultiplier
+        : targetCrashMultiplier ?? currentMultiplier
 
-    return ratios.map((ratio) => {
-      const value = Math.max(1, progressValue * ratio)
-      return `${Math.min(value, MAX_MULTIPLIER).toFixed(2)}x`
-    })
+    return `${Math.min(value, MAX_MULTIPLIER).toFixed(2)}x`
   }, [currentMultiplier, sessionState, targetCrashMultiplier])
 
   const sessionMessage = useMemo(() => {
@@ -129,7 +150,7 @@ export default function Home() {
   useEffect(() => {
     if (sessionState === 'running') {
       setBeamAnimation(false)
-      const timeout = setTimeout(() => setBeamAnimation(true), 200)
+      const timeout = setTimeout(() => setBeamAnimation(true), 180)
       return () => clearTimeout(timeout)
     }
 
@@ -174,6 +195,27 @@ export default function Home() {
     }
   }, [sessionState])
 
+  const beamStyle = useMemo(
+    () => ({
+      opacity: beamAnimation ? 1 : 0,
+      transform: `rotate(-57deg) scaleY(${beamAnimation ? 1 : 0})`,
+      transformOrigin: 'bottom left',
+    }),
+    [beamAnimation]
+  )
+
+  const multiplierClasses = useMemo(() => {
+    if (sessionState === 'running') {
+      return 'text-white drop-shadow-[0_0_35px_rgba(255,255,255,0.85)]'
+    }
+
+    if (sessionState === 'crashed') {
+      return 'text-red-200 drop-shadow-[0_18px_45px_rgba(239,68,68,0.65)]'
+    }
+
+    return 'text-blue-100/90 drop-shadow-[0_15px_45px_rgba(59,130,246,0.55)]'
+  }, [sessionState])
+
   const launchLabel =
     sessionState === 'running'
       ? 'Running...'
@@ -202,8 +244,29 @@ export default function Home() {
   }
 
   return (
-    <main className="relative min-h-screen overflow-hidden bg-gradient-to-b from-[#09002B] via-[#0F0B40] to-[#020215] text-white">
+    <main className={`relative min-h-screen overflow-hidden text-white transition-colors duration-700 ${backgroundClass}`}>
       <div className={`absolute inset-0 ${gradientOverlay}`} />
+      <div className="pointer-events-none absolute inset-0 overflow-hidden">
+        <div className="absolute -left-40 top-10 h-[380px] w-[380px] rounded-full bg-[radial-gradient(circle,rgba(71,72,255,0.4)_0%,rgba(71,72,255,0.05)_70%,transparent_100%)] blur-3xl" />
+        <div className="absolute -right-48 top-1/3 h-[460px] w-[460px] rounded-full bg-[radial-gradient(circle,rgba(236,72,153,0.35)_0%,rgba(236,72,153,0.07)_65%,transparent_100%)] blur-3xl" />
+        <div className="absolute -bottom-40 left-1/2 h-[520px] w-[520px] -translate-x-1/2 rounded-full bg-[radial-gradient(circle,rgba(14,165,233,0.28)_0%,rgba(14,165,233,0.05)_72%,transparent_100%)] blur-[120px]" />
+        {STARFIELD.map((star, index) => (
+          <span
+            // eslint-disable-next-line react/no-array-index-key
+            key={index}
+            className="absolute rounded-full bg-white/90"
+            style={{
+              top: star.top,
+              left: star.left,
+              width: `${star.size}px`,
+              height: `${star.size}px`,
+              opacity: star.opacity,
+              filter: `drop-shadow(0 0 ${star.blur}px rgba(255,255,255,0.9))`,
+              animation: `pulse ${star.duration}s ease-in-out ${star.delay}s infinite`,
+            }}
+          />
+        ))}
+      </div>
 
       <div className="relative mx-auto flex min-h-screen max-w-md flex-col px-5 pb-24 pt-6">
         {/* Header */}
@@ -227,41 +290,33 @@ export default function Home() {
           <div className="relative flex h-[360px] w-full max-w-xs flex-col items-center justify-center overflow-hidden rounded-[32px] border border-white/10 bg-white/5 px-7 py-8 shadow-[0_25px_60px_-20px_rgba(56,97,255,0.6)] backdrop-blur-[32px]">
             <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(255,255,255,0.12),transparent_65%)]" />
 
-            {/* Multipliers */}
-            <div className="relative z-10 flex flex-col items-center gap-8 text-3xl font-semibold tracking-wide text-blue-100/80">
-              {displayedMultipliers.map((value, index) => (
-                <span
-                  key={`${value}-${index}`}
-                  className={`drop-shadow-[0_10px_40px_rgba(53,150,255,0.45)] transition-opacity ${
-                    sessionState === 'running' ? 'opacity-100' : 'opacity-90'
-                  }`}
-                >
-                  {value}
-                </span>
-              ))}
+            {/* Live multiplier */}
+            <div className="relative z-10 flex flex-col items-center">
+              <span className={`text-[4.2rem] font-bold tracking-tight transition-all duration-500 ${multiplierClasses}`}>
+                {displayedMultiplier}
+              </span>
+              <span className="mt-2 text-xs uppercase tracking-[0.4em] text-blue-100/50">Multiplier</span>
             </div>
 
             {/* Beam */}
             <div
-              className={`absolute top-0 flex h-full w-[4px] -translate-x-1/2 transform items-start justify-center transition-all duration-700 ${
-                beamAnimation ? 'scale-y-100 opacity-100' : 'scale-y-0 opacity-0'
-              }`}
-              style={{ left: '52%' }}
+              className="absolute left-[62%] top-[78%] flex h-[420px] w-[6px] -translate-x-1/2 -translate-y-full items-start justify-center transition-all duration-700"
+              style={beamStyle}
             >
               <div className="h-full w-full rounded-full bg-gradient-to-b from-[#5BB6FF] via-[#3D7BFF] to-transparent blur-[1px]" />
-              <div className="absolute h-full w-[6px] rounded-full bg-gradient-to-b from-[#5BB6FF] via-[#3D7BFF] to-transparent opacity-50 blur-[8px]" />
+              <div className="absolute h-full w-[8px] rounded-full bg-gradient-to-b from-[#5BB6FF] via-[#3D7BFF] to-transparent opacity-60 blur-[12px]" />
             </div>
 
             {/* Rocket */}
-            <div className="absolute left-1/2 top-[45%] z-20 -translate-x-1/2 -translate-y-1/2">
-              <div className="relative flex h-32 w-32 items-center justify-center">
-                <div className="absolute -bottom-6 h-24 w-24 rounded-full bg-[radial-gradient(circle,rgba(89,145,255,0.45)_0%,rgba(89,145,255,0.05)_70%,transparent_100%)] blur-2xl" />
+            <div className="absolute left-1/2 top-1/2 z-20 -translate-x-1/2 -translate-y-1/2">
+              <div className="relative flex h-40 w-40 items-center justify-center">
+                <div className="absolute -bottom-10 h-32 w-32 rounded-full bg-[radial-gradient(circle,rgba(89,145,255,0.45)_0%,rgba(89,145,255,0.05)_70%,transparent_100%)] blur-2xl" />
                 <Lottie
                   lottieRef={animationRef}
                   animationData={rocketAnimation}
                   loop
                   autoplay={false}
-                  className="h-32 w-32"
+                  className="h-40 w-40"
                 />
               </div>
             </div>

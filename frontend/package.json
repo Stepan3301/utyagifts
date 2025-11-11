@@ -4,7 +4,7 @@
   "description": "Frontend Telegram Mini App for Rocket Gifts",
   "private": true,
   "scripts": {
-    "dev": "next dev",
+    "dev": "node scripts/dev.js",
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
