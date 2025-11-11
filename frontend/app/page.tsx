@@ -65,14 +65,14 @@ export default function Home() {
     []
   )
 
-  const backgroundClass = useMemo(() => {
+  const gameAreaBackgroundClass = useMemo(() => {
     switch (sessionState) {
       case 'running':
         return 'bg-gradient-to-b from-[#052914] via-[#0A4F2B] to-[#042414]'
       case 'crashed':
         return 'bg-gradient-to-b from-[#2B0508] via-[#5A0F19] to-[#1A0408]'
       default:
-        return 'bg-gradient-to-b from-[#050015] via-[#09002F] to-[#01010A]'
+        return 'bg-white/5'
     }
   }, [sessionState])
 
@@ -244,7 +244,7 @@ export default function Home() {
   }
 
   return (
-    <main className={`relative min-h-screen overflow-hidden text-white transition-colors duration-700 ${backgroundClass}`}>
+    <main className="relative min-h-screen overflow-hidden bg-gradient-to-b from-[#050015] via-[#09002F] to-[#01010A] text-white">
       <div className={`absolute inset-0 ${gradientOverlay}`} />
       <div className="pointer-events-none absolute inset-0 overflow-hidden">
         <div className="absolute -left-40 top-10 h-[380px] w-[380px] rounded-full bg-[radial-gradient(circle,rgba(71,72,255,0.4)_0%,rgba(71,72,255,0.05)_70%,transparent_100%)] blur-3xl" />
@@ -287,16 +287,8 @@ export default function Home() {
 
         {/* Game area */}
         <section className="relative mt-6 flex flex-1 flex-col items-center justify-center">
-          <div className="relative flex h-[360px] w-full max-w-xs flex-col items-center justify-center overflow-hidden rounded-[32px] border border-white/10 bg-white/5 px-7 py-8 shadow-[0_25px_60px_-20px_rgba(56,97,255,0.6)] backdrop-blur-[32px]">
+          <div className={`relative flex h-[360px] w-full max-w-xs flex-col items-center justify-center overflow-hidden rounded-[32px] border border-white/10 px-7 py-8 shadow-[0_25px_60px_-20px_rgba(56,97,255,0.6)] backdrop-blur-[32px] transition-colors duration-700 ${gameAreaBackgroundClass}`}>
             <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(255,255,255,0.12),transparent_65%)]" />
-
-            {/* Live multiplier */}
-            <div className="relative z-10 flex flex-col items-center">
-              <span className={`text-[4.2rem] font-bold tracking-tight transition-all duration-500 ${multiplierClasses}`}>
-                {displayedMultiplier}
-              </span>
-              <span className="mt-2 text-xs uppercase tracking-[0.4em] text-blue-100/50">Multiplier</span>
-            </div>
 
             {/* Beam */}
             <div
@@ -308,7 +300,7 @@ export default function Home() {
             </div>
 
             {/* Rocket */}
-            <div className="absolute left-1/2 top-1/2 z-20 -translate-x-1/2 -translate-y-1/2">
+            <div className="absolute left-1/2 top-[42%] z-20 -translate-x-1/2 -translate-y-1/2">
               <div className="relative flex h-40 w-40 items-center justify-center">
                 <div className="absolute -bottom-10 h-32 w-32 rounded-full bg-[radial-gradient(circle,rgba(89,145,255,0.45)_0%,rgba(89,145,255,0.05)_70%,transparent_100%)] blur-2xl" />
                 <Lottie
@@ -319,6 +311,13 @@ export default function Home() {
                   className="h-40 w-40"
                 />
               </div>
+            </div>
+
+            {/* Live multiplier - below rocket */}
+            <div className="absolute bottom-16 left-1/2 z-10 flex -translate-x-1/2 flex-col items-center">
+              <span className={`text-[2.8rem] font-bold tracking-tight transition-all duration-500 ${multiplierClasses}`}>
+                {displayedMultiplier}
+              </span>
             </div>
           </div>
           <div className="mt-6 text-center text-sm font-medium text-white/80">{sessionMessage}</div>
