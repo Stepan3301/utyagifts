@@ -1,17 +1,12 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
-import { init } from '@twa-dev/sdk'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import WebApp from '@twa-dev/sdk'
+import Lottie, { type LottieRefCurrentProps } from 'lottie-react'
 
-const players = [
-  { name: 'Anastasia', amount: '7 TON', icon: '⭐' },
-  { name: 'Raphael', amount: '1 TON', icon: '⚡' },
-  { name: 'You', amount: '1 TON', icon: '🧑' },
-]
+import rocketAnimation from '@/public/animations/rocket.json'
 
-const multipliers = ['1.2x', '2.4x', '6x', '10x']
-
-const navItems = [
+const NAV_ITEMS = [
   { label: 'Home', icon: '🏠' },
   { label: 'Game', icon: '🚀', active: true },
   { label: 'Gifts', icon: '🎁' },
@@ -19,12 +14,30 @@ const navItems = [
   { label: 'Profile', icon: '👤' },
 ]
 
+const DEFAULT_MULTIPLIERS = ['1.20x', '2.40x', '6.00x', '10.00x']
+const MAX_MULTIPLIER = 20
+
+type SessionState = 'idle' | 'running' | 'cashed' | 'crashed'
+
 export default function Home() {
   const [mounted, setMounted] = useState(false)
   const [beamAnimation, setBeamAnimation] = useState(false)
+  const [sessionState, setSessionState] = useState<SessionState>('idle')
+  const [currentMultiplier, setCurrentMultiplier] = useState(1)
+  const [targetCrashMultiplier, setTargetCrashMultiplier] = useState<number | null>(null)
+  const animationRef = useRef<LottieRefCurrentProps>(null)
+  const crashTargetRef = useRef<number>(10)
 
   useEffect(() => {
-    init()
+    if (typeof window === 'undefined') return
+
+    try {
+      WebApp.ready()
+      WebApp.expand()
+    } catch (error) {
+      console.warn('Telegram WebApp SDK init failed, continuing in fallback mode.', error)
+    }
+
     setMounted(true)
   }, [])
 
@@ -40,6 +53,142 @@ export default function Home() {
       'before:pointer-events-none before:absolute before:inset-0 before:bg-[radial-gradient(circle_at_top,rgba(96,165,250,0.35),transparent_60%),radial-gradient(circle_at_bottom,rgba(250,204,21,0.15),transparent_55%)] before:opacity-80',
     []
   )
+
+  const displayedMultipliers = useMemo(() => {
+    if (sessionState === 'idle') {
+      return DEFAULT_MULTIPLIERS
+    }
+
+    const progressValue = Math.min(currentMultiplier, targetCrashMultiplier ?? 10, MAX_MULTIPLIER)
+    const ratios = [0.35, 0.55, 0.75, 1]
+
+    return ratios.map((ratio) => {
+      const value = Math.max(1, progressValue * ratio)
+      return `${Math.min(value, MAX_MULTIPLIER).toFixed(2)}x`
+    })
+  }, [currentMultiplier, sessionState, targetCrashMultiplier])
+
+  const sessionMessage = useMemo(() => {
+    switch (sessionState) {
+      case 'running':
+        return `Live multiplier: ${currentMultiplier.toFixed(2)}x`
+      case 'cashed':
+        return `You collected at ${currentMultiplier.toFixed(2)}x`
+      case 'crashed':
+        return `Rocket crashed at ${(targetCrashMultiplier ?? currentMultiplier).toFixed(2)}x`
+      default:
+        return 'Ready for launch'
+    }
+  }, [currentMultiplier, sessionState, targetCrashMultiplier])
+
+  const players = useMemo(
+    () => [
+      { name: 'Anastasia', amount: '7 TON', icon: '⭐', status: 'Bet' },
+      { name: 'Raphael', amount: '1 TON', icon: '⚡', status: 'Bet' },
+      {
+        name: 'You',
+        amount:
+          sessionState === 'running' || sessionState === 'cashed' || sessionState === 'crashed'
+            ? `${currentMultiplier.toFixed(2)}x`
+            : '—',
+        icon: '🧑',
+        status:
+          sessionState === 'running'
+            ? 'Live'
+            : sessionState === 'cashed'
+              ? 'Collected'
+              : sessionState === 'crashed'
+                ? 'Crashed'
+                : 'Ready',
+      },
+    ],
+    [currentMultiplier, sessionState]
+  )
+
+  const handleLaunch = useCallback(() => {
+    if (sessionState === 'running') return
+
+    const crashPoint = parseFloat((Math.random() * (MAX_MULTIPLIER - 1.1) + 1.1).toFixed(2))
+    crashTargetRef.current = crashPoint
+
+    setTargetCrashMultiplier(crashPoint)
+    setCurrentMultiplier(1)
+    setSessionState('running')
+
+    if (animationRef.current) {
+      animationRef.current.play()
+    }
+  }, [sessionState])
+
+  const handleCollect = useCallback(() => {
+    if (sessionState !== 'running') return
+
+    setSessionState('cashed')
+  }, [sessionState])
+
+  useEffect(() => {
+    if (sessionState === 'running') {
+      setBeamAnimation(false)
+      const timeout = setTimeout(() => setBeamAnimation(true), 200)
+      return () => clearTimeout(timeout)
+    }
+
+    setBeamAnimation(false)
+  }, [sessionState])
+
+  useEffect(() => {
+    if (sessionState !== 'running') {
+      if (animationRef.current) {
+        animationRef.current.stop()
+        animationRef.current.goToAndStop(0, true)
+      }
+      return
+    }
+
+    const interval = window.setInterval(() => {
+      setCurrentMultiplier((prev) => {
+        const acceleration = prev * 0.03 + 0.05
+        const next = parseFloat((prev + acceleration).toFixed(2))
+
+        if (next >= crashTargetRef.current) {
+          window.clearInterval(interval)
+          setSessionState('crashed')
+          return parseFloat(crashTargetRef.current.toFixed(2))
+        }
+
+        return Math.min(next, MAX_MULTIPLIER)
+      })
+    }, 120)
+
+    return () => window.clearInterval(interval)
+  }, [sessionState])
+
+  useEffect(() => {
+    if (!animationRef.current) return
+
+    if (sessionState === 'running') {
+      animationRef.current.setSpeed(1.1)
+      animationRef.current.play()
+    } else {
+      animationRef.current.stop()
+    }
+  }, [sessionState])
+
+  const launchLabel =
+    sessionState === 'running'
+      ? 'Running...'
+      : sessionState === 'crashed'
+        ? 'Restart'
+        : sessionState === 'cashed'
+          ? 'Replay'
+          : 'Launch'
+  const collectLabel =
+    sessionState === 'running'
+      ? `Collect ${currentMultiplier.toFixed(2)}x`
+      : sessionState === 'cashed'
+        ? 'Collected'
+        : 'Collect'
+  const collectDisabled = sessionState !== 'running'
 
   if (!mounted) {
     return (
@@ -74,14 +223,19 @@ export default function Home() {
         </header>
 
         {/* Game area */}
-        <section className="relative mt-8 flex flex-1 flex-col items-center justify-center">
+        <section className="relative mt-6 flex flex-1 flex-col items-center justify-center">
           <div className="relative flex h-[360px] w-full max-w-xs flex-col items-center justify-center overflow-hidden rounded-[32px] border border-white/10 bg-white/5 px-7 py-8 shadow-[0_25px_60px_-20px_rgba(56,97,255,0.6)] backdrop-blur-[32px]">
             <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(255,255,255,0.12),transparent_65%)]" />
 
             {/* Multipliers */}
             <div className="relative z-10 flex flex-col items-center gap-8 text-3xl font-semibold tracking-wide text-blue-100/80">
-              {multipliers.map((value) => (
-                <span key={value} className="drop-shadow-[0_10px_40px_rgba(53,150,255,0.45)]">
+              {displayedMultipliers.map((value, index) => (
+                <span
+                  key={`${value}-${index}`}
+                  className={`drop-shadow-[0_10px_40px_rgba(53,150,255,0.45)] transition-opacity ${
+                    sessionState === 'running' ? 'opacity-100' : 'opacity-90'
+                  }`}
+                >
                   {value}
                 </span>
               ))}
@@ -100,18 +254,19 @@ export default function Home() {
 
             {/* Rocket */}
             <div className="absolute left-1/2 top-[45%] z-20 -translate-x-1/2 -translate-y-1/2">
-              <div className="relative flex h-24 w-24 items-center justify-center">
-                <div className="absolute -bottom-4 h-16 w-16 rounded-full bg-gradient-to-b from-[#FFD54F] via-[#FFA726] to-transparent blur-2xl opacity-80" />
-                <div className="absolute -bottom-2 h-10 w-10 rounded-full bg-[radial-gradient(circle,rgba(255,189,89,1)_0%,rgba(255,152,0,0.2)_70%,transparent_100%)] opacity-80" />
-                <div className="relative flex h-16 w-10 flex-col items-center justify-center rounded-full border border-white/20 bg-gradient-to-b from-[#3E7BFF] via-[#2953C7] to-[#1A2A6C] shadow-[0_15px_35px_-10px_rgba(59,130,246,0.7)]">
-                  <span className="text-sm font-semibold tracking-[0.3em] text-white/80">TON</span>
-                  <div className="absolute -top-5 flex h-10 w-10 items-center justify-center rounded-full bg-[radial-gradient(circle,rgba(255,203,59,1)_0%,rgba(255,171,0,1)_70%,rgba(255,152,0,0.75)_100%)] text-2xl shadow-[0_10px_25px_-5px_rgba(255,214,64,0.7)]">
-                    🪙
-                  </div>
-                </div>
+              <div className="relative flex h-32 w-32 items-center justify-center">
+                <div className="absolute -bottom-6 h-24 w-24 rounded-full bg-[radial-gradient(circle,rgba(89,145,255,0.45)_0%,rgba(89,145,255,0.05)_70%,transparent_100%)] blur-2xl" />
+                <Lottie
+                  lottieRef={animationRef}
+                  animationData={rocketAnimation}
+                  loop
+                  autoplay={false}
+                  className="h-32 w-32"
+                />
               </div>
             </div>
           </div>
+          <div className="mt-6 text-center text-sm font-medium text-white/80">{sessionMessage}</div>
         </section>
 
         {/* Player list */}
@@ -127,7 +282,7 @@ export default function Home() {
                 </div>
                 <div>
                   <p className="text-base font-semibold">{player.name}</p>
-                  <p className="text-xs text-white/60">Bet</p>
+                  <p className="text-xs text-white/60">{player.status}</p>
                 </div>
               </div>
               <span className="text-base font-semibold text-blue-100">{player.amount}</span>
@@ -137,11 +292,19 @@ export default function Home() {
 
         {/* Actions */}
         <section className="mt-6 flex gap-4">
-          <button className="flex-1 rounded-2xl bg-gradient-to-br from-[#894CFF] via-[#7B5BFF] to-[#5B3CFF] py-4 text-lg font-semibold shadow-[0_18px_40px_-18px_rgba(123,91,255,0.8)] transition hover:brightness-110">
-            Launch
+          <button
+            className="flex-1 rounded-2xl bg-gradient-to-br from-[#894CFF] via-[#7B5BFF] to-[#5B3CFF] py-4 text-lg font-semibold shadow-[0_18px_40px_-18px_rgba(123,91,255,0.8)] transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-60"
+            onClick={handleLaunch}
+            disabled={sessionState === 'running'}
+          >
+            {launchLabel}
           </button>
-          <button className="flex-1 rounded-2xl bg-gradient-to-br from-[#36B8FF] via-[#2F9DFF] to-[#2478FF] py-4 text-lg font-semibold shadow-[0_18px_40px_-18px_rgba(63,157,255,0.8)] transition hover:brightness-110">
-            Collect
+          <button
+            className="flex-1 rounded-2xl bg-gradient-to-br from-[#36B8FF] via-[#2F9DFF] to-[#2478FF] py-4 text-lg font-semibold shadow-[0_18px_40px_-18px_rgba(63,157,255,0.8)] transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-60"
+            onClick={handleCollect}
+            disabled={collectDisabled}
+          >
+            {collectLabel}
           </button>
         </section>
       </div>
@@ -149,7 +312,7 @@ export default function Home() {
       {/* Bottom Navigation */}
       <nav className="fixed inset-x-0 bottom-0 z-30 mx-auto mb-4 w-[92%] max-w-md rounded-[28px] border border-white/10 bg-white/10 px-4 py-3 shadow-[0_25px_60px_-25px_rgba(0,0,0,0.7)] backdrop-blur-xl">
         <div className="flex items-center justify-between">
-          {navItems.map((item) => (
+          {NAV_ITEMS.map((item) => (
             <button
               key={item.label}
               className={`flex flex-col items-center gap-1 text-xs font-medium transition ${
