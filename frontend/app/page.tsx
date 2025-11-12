@@ -15,16 +15,26 @@ const NAV_ITEMS = [
 ]
 
 const STARFIELD = [
-  { top: '12%', left: '18%', size: 4, opacity: 0.85, blur: 18, duration: 3.8, delay: 0 },
-  { top: '28%', left: '68%', size: 3, opacity: 0.6, blur: 14, duration: 4.6, delay: 0.6 },
-  { top: '48%', left: '12%', size: 2, opacity: 0.7, blur: 10, duration: 5.4, delay: 1.1 },
-  { top: '70%', left: '30%', size: 3, opacity: 0.65, blur: 16, duration: 4.2, delay: 1.7 },
-  { top: '78%', left: '72%', size: 4, opacity: 0.75, blur: 22, duration: 3.4, delay: 0.4 },
-  { top: '18%', left: '82%', size: 2, opacity: 0.55, blur: 12, duration: 5.8, delay: 1.9 },
-  { top: '62%', left: '56%', size: 3, opacity: 0.7, blur: 15, duration: 4.8, delay: 1.2 },
-  { top: '38%', left: '42%', size: 2, opacity: 0.6, blur: 9, duration: 5.1, delay: 0.9 },
-  { top: '86%', left: '44%', size: 3, opacity: 0.8, blur: 18, duration: 4.1, delay: 0.3 },
-  { top: '8%', left: '52%', size: 2, opacity: 0.7, blur: 11, duration: 6.2, delay: 1.5 },
+  { top: '8%', left: '12%', size: 3, opacity: 0.9, blur: 20, duration: 3.2, delay: 0 },
+  { top: '15%', left: '45%', size: 4, opacity: 0.85, blur: 24, duration: 4.1, delay: 0.3 },
+  { top: '22%', left: '78%', size: 2, opacity: 0.7, blur: 16, duration: 3.8, delay: 0.6 },
+  { top: '32%', left: '25%', size: 3, opacity: 0.8, blur: 18, duration: 4.5, delay: 0.9 },
+  { top: '38%', left: '68%', size: 5, opacity: 0.9, blur: 28, duration: 3.6, delay: 1.2 },
+  { top: '48%', left: '15%', size: 2, opacity: 0.65, blur: 14, duration: 5.2, delay: 1.5 },
+  { top: '55%', left: '55%', size: 4, opacity: 0.85, blur: 22, duration: 4.3, delay: 1.8 },
+  { top: '62%', left: '82%', size: 3, opacity: 0.75, blur: 19, duration: 3.9, delay: 2.1 },
+  { top: '72%', left: '30%', size: 2, opacity: 0.7, blur: 15, duration: 4.7, delay: 2.4 },
+  { top: '78%', left: '65%', size: 4, opacity: 0.88, blur: 26, duration: 3.5, delay: 2.7 },
+  { top: '85%', left: '18%', size: 3, opacity: 0.8, blur: 20, duration: 4.2, delay: 3.0 },
+  { top: '12%', left: '88%', size: 2, opacity: 0.6, blur: 12, duration: 5.5, delay: 0.2 },
+  { top: '28%', left: '5%', size: 4, opacity: 0.9, blur: 25, duration: 3.7, delay: 0.5 },
+  { top: '42%', left: '92%', size: 2, opacity: 0.65, blur: 13, duration: 4.8, delay: 0.8 },
+  { top: '58%', left: '8%', size: 3, opacity: 0.75, blur: 17, duration: 4.4, delay: 1.1 },
+  { top: '68%', left: '48%', size: 5, opacity: 0.92, blur: 30, duration: 3.4, delay: 1.4 },
+  { top: '88%', left: '75%', size: 2, opacity: 0.7, blur: 14, duration: 5.1, delay: 1.7 },
+  { top: '5%', left: '35%', size: 3, opacity: 0.8, blur: 21, duration: 4.0, delay: 2.0 },
+  { top: '92%', left: '42%', size: 4, opacity: 0.86, blur: 23, duration: 3.8, delay: 2.3 },
+  { top: '18%', left: '58%', size: 2, opacity: 0.68, blur: 11, duration: 5.3, delay: 2.6 },
 ]
 const MAX_MULTIPLIER = 20
 
@@ -82,7 +92,7 @@ export default function Home() {
 
   const displayedMultiplier = useMemo(() => {
     if (sessionState === 'idle') {
-      return '1.00x'
+      return '1.00'
     }
 
     const value =
@@ -90,7 +100,7 @@ export default function Home() {
         ? currentMultiplier
         : targetCrashMultiplier ?? currentMultiplier
 
-    return `${Math.min(value, MAX_MULTIPLIER).toFixed(2)}x`
+    return Math.min(value, MAX_MULTIPLIER).toFixed(2)
   }, [currentMultiplier, sessionState, targetCrashMultiplier])
 
   const sessionMessage = useMemo(() => {
@@ -169,8 +179,12 @@ export default function Home() {
     setBeamAnimation(false)
   }, [sessionState])
 
+  const sessionStartTimeRef = useRef<number>(0)
+  const isRunningRef = useRef<boolean>(false)
+
   useEffect(() => {
     if (sessionState !== 'running') {
+      isRunningRef.current = false
       if (animationRef.current) {
         animationRef.current.stop()
         animationRef.current.goToAndStop(0, true)
@@ -178,22 +192,45 @@ export default function Home() {
       return
     }
 
-    const interval = window.setInterval(() => {
-      setCurrentMultiplier((prev) => {
-        const acceleration = prev * 0.03 + 0.05
-        const next = parseFloat((prev + acceleration).toFixed(2))
+    // Store start time for proportional growth calculation
+    isRunningRef.current = true
+    sessionStartTimeRef.current = performance.now()
+    setCurrentMultiplier(1)
 
-        if (next >= crashTargetRef.current) {
-          window.clearInterval(interval)
-          setSessionState('crashed')
-          return parseFloat(crashTargetRef.current.toFixed(2))
-        }
+    // Use requestAnimationFrame for smooth proportional growth
+    let rafId: number
+    const tick = (timestamp: number) => {
+      if (!isRunningRef.current) return
 
-        return Math.min(next, MAX_MULTIPLIER)
-      })
-    }, 120)
+      const elapsedSeconds = (timestamp - sessionStartTimeRef.current) / 1000
+      // Proportional growth: value = startValue * (ratePerSecond ^ elapsedSeconds)
+      const ratePerSecond = 1.35
+      const next = parseFloat((1 * Math.pow(ratePerSecond, elapsedSeconds)).toFixed(2))
 
-    return () => window.clearInterval(interval)
+      if (next >= crashTargetRef.current) {
+        isRunningRef.current = false
+        setCurrentMultiplier(parseFloat(crashTargetRef.current.toFixed(2)))
+        setSessionState('crashed')
+        return
+      }
+
+      if (next >= MAX_MULTIPLIER) {
+        isRunningRef.current = false
+        setCurrentMultiplier(MAX_MULTIPLIER)
+        setSessionState('crashed')
+        return
+      }
+
+      setCurrentMultiplier(next)
+      rafId = requestAnimationFrame(tick)
+    }
+
+    rafId = requestAnimationFrame(tick)
+
+    return () => {
+      isRunningRef.current = false
+      cancelAnimationFrame(rafId)
+    }
   }, [sessionState])
 
   useEffect(() => {
@@ -216,17 +253,8 @@ export default function Home() {
     [beamAnimation]
   )
 
-  const multiplierClasses = useMemo(() => {
-    if (sessionState === 'running') {
-      return 'text-white drop-shadow-[0_0_35px_rgba(255,255,255,0.85)]'
-    }
-
-    if (sessionState === 'crashed') {
-      return 'text-red-200 drop-shadow-[0_18px_45px_rgba(239,68,68,0.65)]'
-    }
-
-    return 'text-blue-100/90 drop-shadow-[0_15px_45px_rgba(59,130,246,0.55)]'
-  }, [sessionState])
+  // Multiplier always uses the glowing style
+  const multiplierClasses = 'glow-number'
 
   const launchLabel =
     sessionState === 'running'
@@ -329,7 +357,7 @@ export default function Home() {
 
             {/* Live multiplier - below rocket */}
             <div className="absolute bottom-16 left-1/2 z-10 flex -translate-x-1/2 flex-col items-center">
-              <span className={`text-[2.8rem] font-bold tracking-tight transition-all duration-500 ${multiplierClasses}`}>
+              <span className={multiplierClasses}>
                 {displayedMultiplier}
               </span>
             </div>
@@ -359,16 +387,16 @@ export default function Home() {
         </section>
 
         {/* Actions */}
-        <section className="mt-6 flex gap-4">
+        <section className="mt-6 flex gap-3">
           <button
-            className="flex-1 rounded-2xl bg-gradient-to-br from-[#894CFF] via-[#7B5BFF] to-[#5B3CFF] py-4 text-lg font-semibold shadow-[0_18px_40px_-18px_rgba(123,91,255,0.8)] transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-60"
+            className="btn flex-1 min-w-[120px] py-3 text-base font-bold disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:transform-none"
             onClick={handleLaunch}
             disabled={sessionState === 'running'}
           >
             {launchLabel}
           </button>
           <button
-            className="flex-1 rounded-2xl bg-gradient-to-br from-[#36B8FF] via-[#2F9DFF] to-[#2478FF] py-4 text-lg font-semibold shadow-[0_18px_40px_-18px_rgba(63,157,255,0.8)] transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-60"
+            className="btn flex-1 min-w-[120px] py-3 text-base font-bold disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:transform-none"
             onClick={handleCollect}
             disabled={collectDisabled}
           >
