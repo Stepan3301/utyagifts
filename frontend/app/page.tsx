@@ -342,27 +342,45 @@ export default function Home() {
             </div>
 
             {/* Rocket */}
-            <div className="absolute left-1/2 top-[42%] z-20 -translate-x-1/2 -translate-y-1/2">
-              <div className="relative flex h-40 w-40 items-center justify-center">
-                <div className="absolute -bottom-10 h-32 w-32 rounded-full bg-[radial-gradient(circle,rgba(89,145,255,0.45)_0%,rgba(89,145,255,0.05)_70%,transparent_100%)] blur-2xl" />
+            <div className="relative z-20 flex flex-col items-center justify-center">
+              <div className="relative flex h-52 w-52 items-center justify-center">
+                <div className="absolute -bottom-10 h-40 w-40 rounded-full bg-[radial-gradient(circle,rgba(89,145,255,0.45)_0%,rgba(89,145,255,0.05)_70%,transparent_100%)] blur-2xl" />
                 <Lottie
                   lottieRef={animationRef}
                   animationData={rocketAnimation}
                   loop
                   autoplay={false}
-                  className="h-40 w-40"
+                  className="h-52 w-52"
                 />
               </div>
-            </div>
 
-            {/* Live multiplier - below rocket */}
-            <div className="absolute bottom-16 left-1/2 z-10 flex -translate-x-1/2 flex-col items-center">
-              <span className={multiplierClasses}>
-                {displayedMultiplier}
-              </span>
+              {/* Live multiplier - below rocket */}
+              <div className="mt-4 flex flex-col items-center">
+                <span className={multiplierClasses}>
+                  {displayedMultiplier}
+                </span>
+              </div>
             </div>
           </div>
           <div className="mt-6 text-center text-sm font-medium text-white/80">{sessionMessage}</div>
+
+          {/* Actions - moved below game frame */}
+          <section className="mt-6 flex gap-3">
+            <button
+              className="btn flex-1 min-w-[120px] py-3 text-base font-bold disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:transform-none"
+              onClick={handleLaunch}
+              disabled={sessionState === 'running'}
+            >
+              {launchLabel}
+            </button>
+            <button
+              className="btn flex-1 min-w-[120px] py-3 text-base font-bold disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:transform-none"
+              onClick={handleCollect}
+              disabled={collectDisabled}
+            >
+              {collectLabel}
+            </button>
+          </section>
         </section>
 
         {/* Player list */}
@@ -384,24 +402,6 @@ export default function Home() {
               <span className="text-base font-semibold text-blue-100">{player.amount}</span>
             </div>
           ))}
-        </section>
-
-        {/* Actions */}
-        <section className="mt-6 flex gap-3">
-          <button
-            className="btn flex-1 min-w-[120px] py-3 text-base font-bold disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:transform-none"
-            onClick={handleLaunch}
-            disabled={sessionState === 'running'}
-          >
-            {launchLabel}
-          </button>
-          <button
-            className="btn flex-1 min-w-[120px] py-3 text-base font-bold disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:transform-none"
-            onClick={handleCollect}
-            disabled={collectDisabled}
-          >
-            {collectLabel}
-          </button>
         </section>
       </div>
 
