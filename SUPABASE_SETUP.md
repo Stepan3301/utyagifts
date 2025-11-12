@@ -51,7 +51,43 @@ Supabase is an open-source Firebase alternative that provides:
 - **Direct Connection**: For local development, background jobs, migrations
 - **Connection Pooling**: For serverless deployments (Vercel, Netlify), high-traffic apps
 
-## Step 3: Update Your `.env` File
+## Step 3: Do You Need Supabase URL and Anon Key?
+
+### Short Answer: **NO, not for basic Prisma setup**
+
+If you're **only using Prisma** (like this project), you **don't need**:
+- `SUPABASE_URL`
+- `SUPABASE_ANON_KEY`
+
+You **only need** `DATABASE_URL` (the PostgreSQL connection string).
+
+### When You WOULD Need Them:
+
+You'd need `SUPABASE_URL` and `SUPABASE_ANON_KEY` if you want to:
+- Use Supabase client SDK (`@supabase/supabase-js`) in your frontend
+- Enable real-time subscriptions
+- Use Supabase Storage
+- Use Supabase Auth
+- Make direct database queries from client-side code
+
+**For this project:** You're using Prisma on the backend, so you don't need them.
+
+### How to Get Them (If Needed Later):
+
+1. Go to Supabase Dashboard → **Settings** → **API**
+2. Copy:
+   - **Project URL** → This is your `SUPABASE_URL`
+   - **anon public** key → This is your `SUPABASE_ANON_KEY`
+
+Then add to `.env`:
+```env
+SUPABASE_URL=https://xxxxx.supabase.co
+SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+```
+
+---
+
+## Step 4: Update Your `.env` File
 
 ### Backend Environment Variables
 
@@ -126,7 +162,7 @@ JWT_SECRET=your-secret-key-change-in-production
    - Must be wrapped in quotes if it contains special characters
    - Must start with `postgresql://` or `postgres://`
 
-## Step 4: Update Prisma Schema (If Using Connection Pooling)
+## Step 5: Update Prisma Schema (If Using Connection Pooling)
 
 If you're using connection pooling for production, update `backend/prisma/schema.prisma`:
 
@@ -140,7 +176,7 @@ datasource db {
 
 **Only add `directUrl` if you're using connection pooling.** For most cases, just `url` is enough.
 
-## Step 5: Run Database Migrations
+## Step 6: Run Database Migrations
 
 Now that your database is connected, set up your schema:
 
@@ -170,7 +206,7 @@ You should see output like:
 Your database is now in sync with your Prisma schema.
 ```
 
-## Step 6: Verify the Connection
+## Step 7: Verify the Connection
 
 1. **Check in Supabase Dashboard**:
    - Go to **Table Editor** in your Supabase project
@@ -184,7 +220,7 @@ Your database is now in sync with your Prisma schema.
    ```
    This opens a visual database editor at `http://localhost:5555`
 
-## Step 7: Start Your Application
+## Step 8: Start Your Application
 
 ```bash
 # Terminal 1: Start backend

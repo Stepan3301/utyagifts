@@ -48,9 +48,17 @@ Done! ✅
 
 ## 📋 Environment Variables You Need
 
-### Required for Supabase:
+### Required for Supabase (Prisma setup):
 ```env
 DATABASE_URL="postgresql://postgres:password@db.xxx.supabase.co:5432/postgres"
+```
+
+### Optional (only if using Supabase client SDK):
+```env
+# ❌ NOT NEEDED for Prisma-only setup
+# Only add these if you want to use Supabase client SDK, real-time, storage, etc.
+# SUPABASE_URL=https://xxxxx.supabase.co
+# SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
 ```
 
 ### You can DELETE these (not needed with Supabase):
