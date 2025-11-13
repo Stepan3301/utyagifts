@@ -345,9 +345,10 @@ export default function Home() {
 
         {/* Content based on active tab */}
         {activeTab === 'profile' ? (
-          /* Profile View */
-          <section className="relative mt-6 flex flex-1 flex-col items-center justify-center">
-            <div className="relative flex w-full max-w-xs flex-col items-center rounded-[32px] border border-white/10 bg-white/5 px-7 py-12 shadow-[0_25px_60px_-20px_rgba(56,97,255,0.6)] backdrop-blur-[32px]">
+          <>
+            {/* Profile View */}
+            <section className="relative mt-6 flex flex-1 flex-col items-center justify-center">
+              <div className="relative flex w-full max-w-xs flex-col items-center rounded-[32px] border border-white/10 bg-white/5 px-7 py-12 shadow-[0_25px_60px_-20px_rgba(56,97,255,0.6)] backdrop-blur-[32px]">
               <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(255,255,255,0.12),transparent_65%)]" />
               
               {/* Avatar */}
@@ -381,84 +382,88 @@ export default function Home() {
               </div>
             </div>
           </section>
+          </>
         ) : (
-          /* Game area */
-          <section className="relative mt-6 flex flex-1 flex-col items-center justify-center">
-          <div className={`relative flex h-[360px] w-full max-w-xs flex-col items-center justify-center overflow-hidden rounded-[32px] border border-white/10 px-7 py-8 shadow-[0_25px_60px_-20px_rgba(56,97,255,0.6)] backdrop-blur-[32px] transition-colors duration-700 ${gameAreaBackgroundClass}`}>
-            <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(255,255,255,0.12),transparent_65%)]" />
+          <>
+            {/* Game area */}
+            <section className="relative mt-6 flex flex-1 flex-col items-center justify-center">
+              <div className={`relative flex h-[360px] w-full max-w-xs flex-col items-center justify-center overflow-hidden rounded-[32px] border border-white/10 px-7 py-8 shadow-[0_25px_60px_-20px_rgba(56,97,255,0.6)] backdrop-blur-[32px] transition-colors duration-700 ${gameAreaBackgroundClass}`}>
+                <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(255,255,255,0.12),transparent_65%)]" />
 
-            {/* Beam */}
-            <div
-              className="absolute left-[62%] top-[78%] flex h-[420px] w-[6px] -translate-x-1/2 -translate-y-full items-start justify-center transition-all duration-700"
-              style={beamStyle}
-            >
-              <div className="h-full w-full rounded-full bg-gradient-to-b from-[#5BB6FF] via-[#3D7BFF] to-transparent blur-[1px]" />
-              <div className="absolute h-full w-[8px] rounded-full bg-gradient-to-b from-[#5BB6FF] via-[#3D7BFF] to-transparent opacity-60 blur-[12px]" />
-            </div>
+                {/* Beam */}
+                <div
+                  className="absolute left-[62%] top-[78%] flex h-[420px] w-[6px] -translate-x-1/2 -translate-y-full items-start justify-center transition-all duration-700"
+                  style={beamStyle}
+                >
+                  <div className="h-full w-full rounded-full bg-gradient-to-b from-[#5BB6FF] via-[#3D7BFF] to-transparent blur-[1px]" />
+                  <div className="absolute h-full w-[8px] rounded-full bg-gradient-to-b from-[#5BB6FF] via-[#3D7BFF] to-transparent opacity-60 blur-[12px]" />
+                </div>
 
-            {/* Rocket */}
-            <div className="relative z-20 flex flex-col items-center justify-center">
-              <div className="relative flex h-52 w-52 items-center justify-center">
-                <div className="absolute -bottom-10 h-40 w-40 rounded-full bg-[radial-gradient(circle,rgba(89,145,255,0.45)_0%,rgba(89,145,255,0.05)_70%,transparent_100%)] blur-2xl" />
-                <Lottie
-                  lottieRef={animationRef}
-                  animationData={rocketAnimation}
-                  loop
-                  autoplay={false}
-                  className="h-52 w-52"
-                />
-              </div>
-
-              {/* Live multiplier - below rocket */}
-              <div className="mt-4 flex flex-col items-center">
-                <span className={multiplierClasses}>
-                  {displayedMultiplier}
-                </span>
-              </div>
-            </div>
-          </div>
-          <div className="mt-6 text-center text-sm font-medium text-white/80">{sessionMessage}</div>
-
-          {/* Actions - moved below game frame */}
-          <section className="mt-6 flex gap-3">
-            <button
-              className="btn flex-1 min-w-[120px] py-3 text-base font-bold disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:transform-none"
-              onClick={handleLaunch}
-              disabled={sessionState === 'running'}
-            >
-              {launchLabel}
-            </button>
-            <button
-              className="btn flex-1 min-w-[120px] py-3 text-base font-bold disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:transform-none"
-              onClick={handleCollect}
-              disabled={collectDisabled}
-            >
-              {collectLabel}
-            </button>
-          </section>
-        </section>
-
-        {/* Player list - only show on game tab */}
-        {activeTab === 'game' && (
-          <section className="mt-6 space-y-3">
-            {players.map((player) => (
-              <div
-                key={player.name}
-                className="flex items-center justify-between rounded-2xl border border-white/10 bg-white/10 px-4 py-3 text-sm font-medium text-white/90 shadow-[0_15px_35px_-15px_rgba(41,88,255,0.6)] backdrop-blur-lg"
-              >
-                <div className="flex items-center gap-3">
-                  <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-gradient-to-br from-white/25 to-white/5 text-lg">
-                    {player.icon}
+                {/* Rocket */}
+                <div className="relative z-20 flex flex-col items-center justify-center">
+                  <div className="relative flex h-52 w-52 items-center justify-center">
+                    <div className="absolute -bottom-10 h-40 w-40 rounded-full bg-[radial-gradient(circle,rgba(89,145,255,0.45)_0%,rgba(89,145,255,0.05)_70%,transparent_100%)] blur-2xl" />
+                    <Lottie
+                      lottieRef={animationRef}
+                      animationData={rocketAnimation}
+                      loop
+                      autoplay={false}
+                      className="h-52 w-52"
+                    />
                   </div>
-                  <div>
-                    <p className="text-base font-semibold">{player.name}</p>
-                    <p className="text-xs text-white/60">{player.status}</p>
+
+                  {/* Live multiplier - below rocket */}
+                  <div className="mt-4 flex flex-col items-center">
+                    <span className={multiplierClasses}>
+                      {displayedMultiplier}
+                    </span>
                   </div>
                 </div>
-                <span className="text-base font-semibold text-blue-100">{player.amount}</span>
               </div>
-            ))}
-          </section>
+              <div className="mt-6 text-center text-sm font-medium text-white/80">{sessionMessage}</div>
+
+              {/* Actions - moved below game frame */}
+              <section className="mt-6 flex gap-3">
+                <button
+                  className="btn flex-1 min-w-[120px] py-3 text-base font-bold disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:transform-none"
+                  onClick={handleLaunch}
+                  disabled={sessionState === 'running'}
+                >
+                  {launchLabel}
+                </button>
+                <button
+                  className="btn flex-1 min-w-[120px] py-3 text-base font-bold disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:transform-none"
+                  onClick={handleCollect}
+                  disabled={collectDisabled}
+                >
+                  {collectLabel}
+                </button>
+              </section>
+
+              {/* Player list - only show on game tab */}
+              {activeTab === 'game' && (
+                <section className="mt-6 space-y-3">
+                  {players.map((player) => (
+                    <div
+                      key={player.name}
+                      className="flex items-center justify-between rounded-2xl border border-white/10 bg-white/10 px-4 py-3 text-sm font-medium text-white/90 shadow-[0_15px_35px_-15px_rgba(41,88,255,0.6)] backdrop-blur-lg"
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-gradient-to-br from-white/25 to-white/5 text-lg">
+                          {player.icon}
+                        </div>
+                        <div>
+                          <p className="text-base font-semibold">{player.name}</p>
+                          <p className="text-xs text-white/60">{player.status}</p>
+                        </div>
+                      </div>
+                      <span className="text-base font-semibold text-blue-100">{player.amount}</span>
+                    </div>
+                  ))}
+                </section>
+              )}
+            </section>
+          </>
         )}
       </div>
 
