@@ -28,19 +28,14 @@ jobs:
           node-version: '20'
 
       - name: Install dependencies
+        working-directory: ./frontend
         run: |
-          cd frontend
-          # Create package-lock.json if it doesn't exist
-          if [ ! -f package-lock.json ]; then
-            npm install --package-lock-only --legacy-peer-deps
-          fi
-          # Install dependencies
+          # Install dependencies (will create package-lock.json if missing)
           npm install --legacy-peer-deps --no-audit --no-fund
 
       - name: Build Next.js app
-        run: |
-          cd frontend
-          npm run build
+        working-directory: ./frontend
+        run: npm run build
         env:
           NODE_ENV: production
           NEXT_PUBLIC_API_BASE_URL: ${{ secrets.NEXT_PUBLIC_API_BASE_URL || '' }}
@@ -52,7 +47,7 @@ jobs:
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          path: frontend/out
+          path: ./frontend/out
 
   deploy:
     environment:
@@ -64,4 +59,3 @@ jobs:
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v4
-
