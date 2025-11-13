@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Dark Neon Bottom Nav</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+
+  <!-- просто фон для примера -->
+  <div class="demo-bg"></div>
+
+  <!-- НАВИГАЦИЯ -->
+  <nav class="neo-nav">
+    <button class="nav-item nav-item--active" data-tab="home">
+      <span class="nav-icon">
+        <!-- home icon -->
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <path d="M4 11.6 11.3 4c.4-.4 1-.4 1.4 0L20 11.6V20a1 1 0 0 1-1 1h-4.5a.5.5 0 0 1-.5-.5V16a2 2 0 0 0-2-2h-1a2 2 0 0 0-2 2v4.5a.5.5 0 0 1-.5.5H5a1 1 0 0 1-1-1v-8.4Z"/>
+        </svg>
+      </span>
+      <span class="nav-label">Home</span>
+    </button>
+
+    <button class="nav-item" data-tab="game">
+      <span class="nav-icon">
+        <!-- gamepad -->
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <path d="M6.5 8A4.5 4.5 0 0 0 2 12.5v1.2A4.3 4.3 0 0 0 4.9 18l1.7.6a1 1 0 0 0 1.2-.5l.9-1.8h4.6l.9 1.8a1 1 0 0 0 1.2.5l1.7-.6A4.3 4.3 0 0 0 22 13.7v-1.2A4.5 4.5 0 0 0 17.5 8h-11ZM8.2 11a.8.8 0 0 1 .8.8V13h1.2a.8.8 0 0 1 0 1.6H9v1.2a.8.8 0 1 1-1.6 0V14H6.2A.8.8 0 0 1 6.2 13H7.4v-1.2a.8.8 0 0 1 .8-.8Zm7.8.6a1 1 0 1 1 0 2 1 1 0 0 1 0-2Zm1.8-1.8a1 1 0 1 1-1.4 1.4 1 1 0 0 1 1.4-1.4Z"/>
+        </svg>
+      </span>
+      <span class="nav-label">Game</span>
+    </button>
+
+    <button class="nav-item" data-tab="gifts">
+      <span class="nav-icon">
+        <!-- gift -->
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <path d="M8.8 4C7.2 4 6 5.4 6 7s1.2 3 2.8 3h.7L8.8 4Zm1.9 0v6H12V4h-1.3Zm3.3 0h-.7L14.5 10h.7C16.8 10 18 8.6 18 7s-1.2-3-3-3Zm3.3 6H19a1 1 0 0 1 1 1v2.5H12V10h5.3ZM4 11a1 1 0 0 1 1-1h2.7v3.5H4V11Zm7 4.5V21H5a1 1 0 0 1-1-1v-4.5h7Zm2 0h7V20a1 1 0 0 1-1 1h-6v-5.5Z"/>
+        </svg>
+      </span>
+      <span class="nav-label">Gifts</span>
+    </button>
+
+    <button class="nav-item" data-tab="stats">
+      <span class="nav-icon">
+        <!-- stats -->
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <path d="M5 11.5a1 1 0 0 1 1-1h1.5a1 1 0 0 1 1 1V19a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1v-7.5Zm5-4a1 1 0 0 1 1-1h1.5a1 1 0 0 1 1 1V19a1 1 0 0 1-1 1H11a1 1 0 0 1-1-1V7.5Zm5-3a1 1 0 0 1 1-1h1.5a1 1 0 0 1 1 1V19a1 1 0 0 1-1 1H16a1 1 0 0 1-1-1V4.5Z"/>
+        </svg>
+      </span>
+      <span class="nav-label">Stats</span>
+    </button>
+
+    <button class="nav-item" data-tab="profile">
+      <span class="nav-icon">
+        <!-- profile -->
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <path d="M12 4.2a3.3 3.3 0 1 1 0 6.6 3.3 3.3 0 0 1 0-6.6Zm0 8.7c3.3 0 6 2.1 6 4.8 0 1-.8 1.8-1.8 1.8H7.8A1.8 1.8 0 0 1 6 17.7c0-2.7 2.7-4.8 6-4.8Z"/>
+        </svg>
+      </span>
+      <span class="nav-label">Profile</span>
+    </button>
+
+    <!-- активный подсвет (подложка) -->
+    <div class="nav-indicator"></div>
+  </nav>
+
+  <script src="app.js"></script>
+</body>
+</html>
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, "SF Pro Display",
+    sans-serif;
+}
+
+/* фон для примера, в телеге можно убрать */
+.demo-bg {
+  position: fixed;
+  inset: 0;
+  background:
+    radial-gradient(circle at 10% 0%, #283b93 0, transparent 50%),
+    radial-gradient(circle at 80% 100%, #8b3bff 0, transparent 55%),
+    radial-gradient(circle at 0% 100%, #3d1045 0, transparent 60%),
+    #020310;
+  z-index: -1;
+}
+
+/* === BOTTOM NAV === */
+.neo-nav {
+  position: fixed;
+  left: 50%;
+  bottom: 18px;
+  transform: translateX(-50%);
+  width: min(520px, 100% - 24px);
+  padding: 6px;
+  border-radius: 999px;
+  background: radial-gradient(circle at 10% 0%, rgba(90,130,255,0.35), rgba(8,9,25,0.9) 60%);
+  box-shadow:
+    0 18px 50px rgba(0, 0, 0, 0.85),
+    0 0 0 1px rgba(120,150,255,0.22);
+  backdrop-filter: blur(18px);
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0,1fr));
+  align-items: stretch;
+  gap: 4px;
+  overflow: hidden;
+}
+
+/* плавная подсветка активного таба */
+.nav-indicator {
+  position: absolute;
+  inset: 4px;
+  width: calc(20% - 8px);
+  border-radius: 999px;
+  background: radial-gradient(circle at 20% 0%, rgba(255,255,255,0.55), transparent 70%),
+              linear-gradient(135deg, #4da3ff, #8a63ff);
+  box-shadow:
+    0 0 18px rgba(80,160,255,0.85),
+    0 12px 28px rgba(0,0,0,0.7);
+  transform: translateX(0);
+  transition: transform 0.22s cubic-bezier(.25,.9,.35,1.35);
+  z-index: 0;
+}
+
+/* кнопки */
+.nav-item {
+  position: relative;
+  border: none;
+  background: transparent;
+  border-radius: 999px;
+  padding: 6px 4px 8px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  cursor: pointer;
+  color: #9fa7d6;
+  font-size: 11px;
+  font-weight: 500;
+  z-index: 1;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.nav-item:hover {
+  color: #dde4ff;
+}
+
+.nav-item--active {
+  color: #ffffff;
+}
+
+/* иконки */
+.nav-icon {
+  width: 30px;
+  height: 30px;
+  border-radius: 999px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+}
+
+.nav-icon::before {
+  content: "";
+  position: absolute;
+  inset: 2px;
+  border-radius: inherit;
+  background: radial-gradient(circle at 30% 0%, rgba(255,255,255,0.22), transparent 70%);
+  opacity: 0;
+  transition: opacity .18s ease;
+}
+
+.nav-item--active .nav-icon::before {
+  opacity: 1;
+}
+
+.nav-icon svg {
+  width: 18px;
+  height: 18px;
+  fill: currentColor;
+  filter: drop-shadow(0 0 6px rgba(255,255,255,0.45));
+}
+
+/* подписи */
+.nav-label {
+  line-height: 1;
+  text-shadow: 0 0 12px rgba(0,0,0,0.8);
+}
+
+/* небольшая анимация при активировании */
+.nav-item--active .nav-icon svg {
+  animation: bump .18s ease-out;
+}
+
+@keyframes bump {
+  0%   { transform: translateY(1px) scale(0.9); }
+  80%  { transform: translateY(-1px) scale(1.05); }
+  100% { transform: translateY(0) scale(1); }
+}
+
+/* адаптивчик */
+@media (max-width: 480px) {
+  .neo-nav {
+    bottom: 12px;
+    width: calc(100% - 12px);
+  }
+  .nav-label {
+    font-size: 10px;
+  }
+}

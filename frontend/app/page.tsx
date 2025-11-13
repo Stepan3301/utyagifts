@@ -1,17 +1,57 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type JSX } from 'react'
 import WebApp from '@twa-dev/sdk'
 import Lottie, { type LottieRefCurrentProps } from 'lottie-react'
 
 import rocketAnimation from '@/public/animations/rocket.json'
 
-const NAV_ITEMS = [
-  { label: 'Home', icon: '🏠', id: 'home' },
-  { label: 'Game', icon: '🚀', id: 'game' },
-  { label: 'Gifts', icon: '🎁', id: 'gifts' },
-  { label: 'Stats', icon: '📊', id: 'stats' },
-  { label: 'Profile', icon: '👤', id: 'profile' },
+const NAV_ITEMS: Array<{ label: string; id: string; icon: JSX.Element }> = [
+  {
+    label: 'Home',
+    id: 'home',
+    icon: (
+      <svg viewBox="0 0 24 24" aria-hidden="true">
+        <path d="M4 11.6 11.3 4c.4-.4 1-.4 1.4 0L20 11.6V20a1 1 0 0 1-1 1h-4.5a.5.5 0 0 1-.5-.5V16a2 2 0 0 0-2-2h-1a2 2 0 0 0-2 2v4.5a.5.5 0 0 1-.5.5H5a1 1 0 0 1-1-1v-8.4Z" />
+      </svg>
+    ),
+  },
+  {
+    label: 'Game',
+    id: 'game',
+    icon: (
+      <svg viewBox="0 0 24 24" aria-hidden="true">
+        <path d="M6.5 8A4.5 4.5 0 0 0 2 12.5v1.2A4.3 4.3 0 0 0 4.9 18l1.7.6a1 1 0 0 0 1.2-.5l.9-1.8h4.6l.9 1.8a1 1 0 0 0 1.2.5l1.7-.6A4.3 4.3 0 0 0 22 13.7v-1.2A4.5 4.5 0 0 0 17.5 8h-11ZM8.2 11a.8.8 0 0 1 .8.8V13h1.2a.8.8 0 0 1 0 1.6H9v1.2a.8.8 0 1 1-1.6 0V14H6.2A.8.8 0 0 1 6.2 13H7.4v-1.2a.8.8 0 0 1 .8-.8Zm7.8.6a1 1 0 1 1 0 2 1 1 0 0 1 0-2Zm1.8-1.8a1 1 0 1 1-1.4 1.4 1 1 0 0 1 1.4-1.4Z" />
+      </svg>
+    ),
+  },
+  {
+    label: 'Gifts',
+    id: 'gifts',
+    icon: (
+      <svg viewBox="0 0 24 24" aria-hidden="true">
+        <path d="M8.8 4C7.2 4 6 5.4 6 7s1.2 3 2.8 3h.7L8.8 4Zm1.9 0v6H12V4h-1.3Zm3.3 0h-.7L14.5 10h.7C16.8 10 18 8.6 18 7s-1.2-3-3-3Zm3.3 6H19a1 1 0 0 1 1 1v2.5H12V10h5.3ZM4 11a1 1 0 0 1 1-1h2.7v3.5H4V11Zm7 4.5V21H5a1 1 0 0 1-1-1v-4.5h7Zm2 0h7V20a1 1 0 0 1-1 1h-6v-5.5Z" />
+      </svg>
+    ),
+  },
+  {
+    label: 'Stats',
+    id: 'stats',
+    icon: (
+      <svg viewBox="0 0 24 24" aria-hidden="true">
+        <path d="M5 11.5a1 1 0 0 1 1-1h1.5a1 1 0 0 1 1 1V19a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1v-7.5Zm5-4a1 1 0 0 1 1-1h1.5a1 1 0 0 1 1 1V19a1 1 0 0 1-1 1H11a1 1 0 0 1-1-1V7.5Zm5-3a1 1 0 0 1 1-1h1.5a1 1 0 0 1 1 1V19a1 1 0 0 1-1 1H16a1 1 0 0 1-1-1V4.5Z" />
+      </svg>
+    ),
+  },
+  {
+    label: 'Profile',
+    id: 'profile',
+    icon: (
+      <svg viewBox="0 0 24 24" aria-hidden="true">
+        <path d="M12 4.2a3.3 3.3 0 1 1 0 6.6 3.3 3.3 0 0 1 0-6.6Zm0 8.7c3.3 0 6 2.1 6 4.8 0 1-.8 1.8-1.8 1.8H7.8A1.8 1.8 0 0 1 6 17.7c0-2.7 2.7-4.8 6-4.8Z" />
+      </svg>
+    ),
+  },
 ]
 
 const STARFIELD = [
@@ -271,6 +311,18 @@ export default function Home() {
 
   // Multiplier always uses the glowing style
   const multiplierClasses = 'glow-number'
+
+  const activeIndex = useMemo(() => {
+    const index = NAV_ITEMS.findIndex((item) => item.id === activeTab)
+    return index === -1 ? 0 : index
+  }, [activeTab])
+
+  const indicatorStyle = useMemo(
+    () => ({
+      transform: `translateX(${activeIndex * 100}%)`,
+    }),
+    [activeIndex]
+  )
 
   const launchLabel =
     sessionState === 'running'
@@ -625,32 +677,24 @@ export default function Home() {
       </div>
 
       {/* Bottom Navigation */}
-      <nav className="fixed inset-x-0 bottom-0 z-30 mx-auto mb-4 w-[92%] max-w-md rounded-[28px] border border-white/10 bg-white/10 px-4 py-3 shadow-[0_25px_60px_-25px_rgba(0,0,0,0.7)] backdrop-blur-xl">
-        <div className="flex items-center justify-between">
-          {NAV_ITEMS.map((item) => {
-            const isActive = activeTab === item.id
-            return (
-              <button
-                key={item.id}
-                onClick={() => setActiveTab(item.id)}
-                className={`flex flex-col items-center gap-1 text-xs font-medium transition ${
-                  isActive ? 'text-white' : 'text-white/50'
-                }`}
-              >
-                <span
-                  className={`flex h-10 w-10 items-center justify-center rounded-full transition ${
-                    isActive
-                      ? 'bg-gradient-to-br from-[#36B8FF] to-[#2478FF] shadow-[0_10px_25px_-10px_rgba(36,120,255,0.9)]'
-                      : 'bg-white/10'
-                  } text-base`}
-                >
-                  {item.icon}
-                </span>
-                {item.label}
-              </button>
-            )
-          })}
-        </div>
+      <nav className="neo-nav" role="navigation" aria-label="Main navigation">
+        <div className="nav-indicator" style={indicatorStyle} />
+        {NAV_ITEMS.map((item) => {
+          const isActive = activeTab === item.id
+          return (
+            <button
+              key={item.id}
+              type="button"
+              data-tab={item.id}
+              onClick={() => setActiveTab(item.id)}
+              className={`nav-item${isActive ? ' nav-item--active' : ''}`}
+              aria-current={isActive ? 'page' : undefined}
+            >
+              <span className="nav-icon">{item.icon}</span>
+              <span className="nav-label">{item.label}</span>
+            </button>
+          )
+        })}
       </nav>
     </main>
   )
