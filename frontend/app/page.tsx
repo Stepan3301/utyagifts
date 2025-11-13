@@ -50,7 +50,7 @@ interface TelegramUser {
 
 export default function Home() {
   const [mounted, setMounted] = useState(false)
-  const [activeTab, setActiveTab] = useState<string>('game')
+  const [activeTab, setActiveTab] = useState<string>('home')
   const [telegramUser, setTelegramUser] = useState<TelegramUser | null>(null)
   const [beamAnimation, setBeamAnimation] = useState(false)
   const [sessionState, setSessionState] = useState<SessionState>('idle')
@@ -344,44 +344,164 @@ export default function Home() {
         </header>
 
         {/* Content based on active tab */}
-        {activeTab === 'profile' ? (
+        {activeTab === 'home' ? (
+          <>
+            {/* Home View */}
+            <section className="relative mt-6 flex flex-1 flex-col">
+              <div className="relative w-full rounded-[32px] border border-white/10 bg-white/5 px-6 py-8 shadow-[0_25px_60px_-20px_rgba(56,97,255,0.6)] backdrop-blur-[32px]">
+                <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(255,255,255,0.12),transparent_65%)]" />
+                
+                <div className="relative z-10">
+                  <h1 className="text-3xl font-bold text-white mb-2">Welcome! 🚀</h1>
+                  <p className="text-white/70 mb-6">Ready to launch and collect amazing gifts?</p>
+                  
+                  <div className="space-y-4">
+                    <div className="rounded-2xl border border-white/10 bg-white/10 px-4 py-4 backdrop-blur-lg">
+                      <div className="flex items-center gap-3 mb-2">
+                        <span className="text-2xl">🎮</span>
+                        <h3 className="text-lg font-semibold text-white">Game</h3>
+                      </div>
+                      <p className="text-sm text-white/60">Launch rockets and collect multipliers to win gifts!</p>
+                    </div>
+                    
+                    <div className="rounded-2xl border border-white/10 bg-white/10 px-4 py-4 backdrop-blur-lg">
+                      <div className="flex items-center gap-3 mb-2">
+                        <span className="text-2xl">🎁</span>
+                        <h3 className="text-lg font-semibold text-white">Gifts</h3>
+                      </div>
+                      <p className="text-sm text-white/60">Browse and manage your collected gifts</p>
+                    </div>
+                    
+                    <div className="rounded-2xl border border-white/10 bg-white/10 px-4 py-4 backdrop-blur-lg">
+                      <div className="flex items-center gap-3 mb-2">
+                        <span className="text-2xl">📊</span>
+                        <h3 className="text-lg font-semibold text-white">Stats</h3>
+                      </div>
+                      <p className="text-sm text-white/60">Track your game performance and achievements</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </section>
+          </>
+        ) : activeTab === 'gifts' ? (
+          <>
+            {/* Gifts View */}
+            <section className="relative mt-6 flex flex-1 flex-col">
+              <div className="relative w-full rounded-[32px] border border-white/10 bg-white/5 px-6 py-8 shadow-[0_25px_60px_-20px_rgba(56,97,255,0.6)] backdrop-blur-[32px]">
+                <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(255,255,255,0.12),transparent_65%)]" />
+                
+                <div className="relative z-10">
+                  <h1 className="text-3xl font-bold text-white mb-6">Your Gifts 🎁</h1>
+                  
+                  <div className="space-y-4">
+                    <div className="text-center py-12">
+                      <div className="text-6xl mb-4">🎁</div>
+                      <p className="text-white/70 text-lg mb-2">No gifts yet</p>
+                      <p className="text-white/50 text-sm">Play the game to collect amazing gifts!</p>
+                    </div>
+                  </div>
+                  
+                  {/* Placeholder for future gift grid */}
+                  <div className="mt-6 grid grid-cols-2 gap-4 opacity-50">
+                    {[1, 2, 3, 4].map((i) => (
+                      <div
+                        key={i}
+                        className="rounded-2xl border border-white/10 bg-white/5 aspect-square flex items-center justify-center backdrop-blur-lg"
+                      >
+                        <span className="text-4xl">🎁</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </section>
+          </>
+        ) : activeTab === 'stats' ? (
+          <>
+            {/* Stats View */}
+            <section className="relative mt-6 flex flex-1 flex-col">
+              <div className="relative w-full rounded-[32px] border border-white/10 bg-white/5 px-6 py-8 shadow-[0_25px_60px_-20px_rgba(56,97,255,0.6)] backdrop-blur-[32px]">
+                <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(255,255,255,0.12),transparent_65%)]" />
+                
+                <div className="relative z-10">
+                  <h1 className="text-3xl font-bold text-white mb-6">Statistics 📊</h1>
+                  
+                  <div className="space-y-4">
+                    <div className="rounded-2xl border border-white/10 bg-white/10 px-5 py-4 backdrop-blur-lg">
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="text-white/70">Total Games</span>
+                        <span className="text-xl font-bold text-white">0</span>
+                      </div>
+                    </div>
+                    
+                    <div className="rounded-2xl border border-white/10 bg-white/10 px-5 py-4 backdrop-blur-lg">
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="text-white/70">Best Multiplier</span>
+                        <span className="text-xl font-bold text-white">—</span>
+                      </div>
+        </div>
+
+                    <div className="rounded-2xl border border-white/10 bg-white/10 px-5 py-4 backdrop-blur-lg">
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="text-white/70">Total Gifts</span>
+                        <span className="text-xl font-bold text-white">0</span>
+            </div>
+            </div>
+                    
+                    <div className="rounded-2xl border border-white/10 bg-white/10 px-5 py-4 backdrop-blur-lg">
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="text-white/70">Win Rate</span>
+                        <span className="text-xl font-bold text-white">—</span>
+            </div>
+          </div>
+        </div>
+
+                  <div className="mt-8 text-center">
+                    <p className="text-white/50 text-sm">Start playing to see your stats!</p>
+                  </div>
+                </div>
+              </div>
+            </section>
+          </>
+        ) : activeTab === 'profile' ? (
           <>
             {/* Profile View */}
             <section className="relative mt-6 flex flex-1 flex-col items-center justify-center">
               <div className="relative flex w-full max-w-xs flex-col items-center rounded-[32px] border border-white/10 bg-white/5 px-7 py-12 shadow-[0_25px_60px_-20px_rgba(56,97,255,0.6)] backdrop-blur-[32px]">
-              <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(255,255,255,0.12),transparent_65%)]" />
-              
-              {/* Avatar */}
-              <div className="relative z-10 mb-6">
-                {telegramUser?.photo_url ? (
-                  <img
-                    src={telegramUser.photo_url}
-                    alt="Profile"
-                    className="h-32 w-32 rounded-full border-4 border-white/20 object-cover shadow-[0_0_40px_rgba(255,255,255,0.3)]"
-                  />
-                ) : (
-                  <div className="flex h-32 w-32 items-center justify-center rounded-full border-4 border-white/20 bg-gradient-to-br from-[#36B8FF] to-[#2478FF] text-5xl shadow-[0_0_40px_rgba(255,255,255,0.3)]">
-                    👤
-                  </div>
-                )}
-              </div>
+                <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(255,255,255,0.12),transparent_65%)]" />
+                
+                {/* Avatar */}
+                <div className="relative z-10 mb-6">
+                  {telegramUser?.photo_url ? (
+                    <img
+                      src={telegramUser.photo_url}
+                      alt="Profile"
+                      className="h-32 w-32 rounded-full border-4 border-white/20 object-cover shadow-[0_0_40px_rgba(255,255,255,0.3)]"
+                    />
+                  ) : (
+                    <div className="flex h-32 w-32 items-center justify-center rounded-full border-4 border-white/20 bg-gradient-to-br from-[#36B8FF] to-[#2478FF] text-5xl shadow-[0_0_40px_rgba(255,255,255,0.3)]">
+                      👤
+                    </div>
+                  )}
+                </div>
 
-              {/* Username */}
-              <div className="relative z-10 text-center">
-                <h2 className="text-2xl font-bold text-white">
-                  {telegramUser?.username ? `@${telegramUser.username}` : 'User'}
-                </h2>
-                {(telegramUser?.first_name || telegramUser?.last_name) && (
-                  <p className="mt-2 text-base text-white/70">
-                    {[telegramUser.first_name, telegramUser.last_name].filter(Boolean).join(' ')}
-                  </p>
-                )}
-                {!telegramUser && (
-                  <p className="mt-2 text-sm text-white/50">Loading user data...</p>
-                )}
+                {/* Username */}
+                <div className="relative z-10 text-center">
+                  <h2 className="text-2xl font-bold text-white">
+                    {telegramUser?.username ? `@${telegramUser.username}` : 'User'}
+                  </h2>
+                  {(telegramUser?.first_name || telegramUser?.last_name) && (
+                    <p className="mt-2 text-base text-white/70">
+                      {[telegramUser.first_name, telegramUser.last_name].filter(Boolean).join(' ')}
+                    </p>
+                  )}
+                  {!telegramUser && (
+                    <p className="mt-2 text-sm text-white/50">Loading user data...</p>
+                  )}
+                </div>
               </div>
-            </div>
-          </section>
+            </section>
           </>
         ) : (
           <>
@@ -464,6 +584,43 @@ export default function Home() {
               )}
             </section>
           </>
+        )}
+
+        {/* Inventory Block - shown on game tab */}
+        {activeTab === 'game' && (
+          <section className="mt-6 w-full">
+            <div className="relative rounded-[24px] border border-white/10 bg-white/5 px-5 py-4 shadow-[0_15px_35px_-15px_rgba(41,88,255,0.4)] backdrop-blur-xl">
+              <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(255,255,255,0.08),transparent_65%)]" />
+              
+              <div className="relative z-10">
+                <div className="flex items-center justify-between mb-3">
+                  <h3 className="text-lg font-semibold text-white flex items-center gap-2">
+                    <span>🎒</span>
+                    Inventory
+                  </h3>
+                  <span className="text-xs text-white/50">0 items</span>
+                </div>
+                
+                {/* Placeholder for inventory items */}
+                <div className="flex gap-3 overflow-x-auto pb-2 scrollbar-hide">
+                  <div className="flex-shrink-0 w-20 h-20 rounded-xl border border-white/10 bg-white/5 flex items-center justify-center backdrop-blur-lg opacity-50">
+                    <span className="text-2xl">🎁</span>
+                  </div>
+                  <div className="flex-shrink-0 w-20 h-20 rounded-xl border border-white/10 bg-white/5 flex items-center justify-center backdrop-blur-lg opacity-50">
+                    <span className="text-2xl">🎁</span>
+                  </div>
+                  <div className="flex-shrink-0 w-20 h-20 rounded-xl border border-white/10 bg-white/5 flex items-center justify-center backdrop-blur-lg opacity-50">
+                    <span className="text-2xl">🎁</span>
+                  </div>
+                  <div className="flex-shrink-0 w-20 h-20 rounded-xl border border-white/10 bg-white/5 flex items-center justify-center backdrop-blur-lg opacity-50">
+                    <span className="text-2xl">🎁</span>
+                  </div>
+                </div>
+                
+                <p className="text-xs text-white/40 mt-3 text-center">Your collected gifts will appear here</p>
+              </div>
+        </div>
+          </section>
         )}
       </div>
 
