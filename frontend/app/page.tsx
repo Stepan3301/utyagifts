@@ -7,11 +7,11 @@ import Lottie, { type LottieRefCurrentProps } from 'lottie-react'
 import rocketAnimation from '@/public/animations/rocket.json'
 
 const NAV_ITEMS = [
-  { label: 'Home', icon: '🏠' },
-  { label: 'Game', icon: '🚀', active: true },
-  { label: 'Gifts', icon: '🎁' },
-  { label: 'Stats', icon: '📊' },
-  { label: 'Profile', icon: '👤' },
+  { label: 'Home', icon: '🏠', id: 'home' },
+  { label: 'Game', icon: '🚀', id: 'game' },
+  { label: 'Gifts', icon: '🎁', id: 'gifts' },
+  { label: 'Stats', icon: '📊', id: 'stats' },
+  { label: 'Profile', icon: '👤', id: 'profile' },
 ]
 
 const STARFIELD = [
@@ -40,8 +40,18 @@ const MAX_MULTIPLIER = 20
 
 type SessionState = 'idle' | 'running' | 'cashed' | 'crashed'
 
+interface TelegramUser {
+  id: number
+  first_name?: string
+  last_name?: string
+  username?: string
+  photo_url?: string
+}
+
 export default function Home() {
   const [mounted, setMounted] = useState(false)
+  const [activeTab, setActiveTab] = useState<string>('game')
+  const [telegramUser, setTelegramUser] = useState<TelegramUser | null>(null)
   const [beamAnimation, setBeamAnimation] = useState(false)
   const [sessionState, setSessionState] = useState<SessionState>('idle')
   const [currentMultiplier, setCurrentMultiplier] = useState(1)
@@ -56,6 +66,12 @@ export default function Home() {
     try {
       WebApp.ready()
       WebApp.expand()
+
+      // Get Telegram user data
+      const initData = WebApp.initDataUnsafe
+      if (initData?.user) {
+        setTelegramUser(initData.user as TelegramUser)
+      }
     } catch (error) {
       console.warn('Telegram WebApp SDK init failed, continuing in fallback mode.', error)
     }
@@ -92,7 +108,7 @@ export default function Home() {
 
   const displayedMultiplier = useMemo(() => {
     if (sessionState === 'idle') {
-      return '1.00'
+      return '1.00x'
     }
 
     const value =
@@ -100,7 +116,7 @@ export default function Home() {
         ? currentMultiplier
         : targetCrashMultiplier ?? currentMultiplier
 
-    return Math.min(value, MAX_MULTIPLIER).toFixed(2)
+    return `${Math.min(value, MAX_MULTIPLIER).toFixed(2)}x`
   }, [currentMultiplier, sessionState, targetCrashMultiplier])
 
   const sessionMessage = useMemo(() => {
@@ -327,8 +343,47 @@ export default function Home() {
           </div>
         </header>
 
-        {/* Game area */}
-        <section className="relative mt-6 flex flex-1 flex-col items-center justify-center">
+        {/* Content based on active tab */}
+        {activeTab === 'profile' ? (
+          /* Profile View */
+          <section className="relative mt-6 flex flex-1 flex-col items-center justify-center">
+            <div className="relative flex w-full max-w-xs flex-col items-center rounded-[32px] border border-white/10 bg-white/5 px-7 py-12 shadow-[0_25px_60px_-20px_rgba(56,97,255,0.6)] backdrop-blur-[32px]">
+              <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(255,255,255,0.12),transparent_65%)]" />
+              
+              {/* Avatar */}
+              <div className="relative z-10 mb-6">
+                {telegramUser?.photo_url ? (
+                  <img
+                    src={telegramUser.photo_url}
+                    alt="Profile"
+                    className="h-32 w-32 rounded-full border-4 border-white/20 object-cover shadow-[0_0_40px_rgba(255,255,255,0.3)]"
+                  />
+                ) : (
+                  <div className="flex h-32 w-32 items-center justify-center rounded-full border-4 border-white/20 bg-gradient-to-br from-[#36B8FF] to-[#2478FF] text-5xl shadow-[0_0_40px_rgba(255,255,255,0.3)]">
+                    👤
+                  </div>
+                )}
+              </div>
+
+              {/* Username */}
+              <div className="relative z-10 text-center">
+                <h2 className="text-2xl font-bold text-white">
+                  {telegramUser?.username ? `@${telegramUser.username}` : 'User'}
+                </h2>
+                {(telegramUser?.first_name || telegramUser?.last_name) && (
+                  <p className="mt-2 text-base text-white/70">
+                    {[telegramUser.first_name, telegramUser.last_name].filter(Boolean).join(' ')}
+                  </p>
+                )}
+                {!telegramUser && (
+                  <p className="mt-2 text-sm text-white/50">Loading user data...</p>
+                )}
+              </div>
+            </div>
+          </section>
+        ) : (
+          /* Game area */
+          <section className="relative mt-6 flex flex-1 flex-col items-center justify-center">
           <div className={`relative flex h-[360px] w-full max-w-xs flex-col items-center justify-center overflow-hidden rounded-[32px] border border-white/10 px-7 py-8 shadow-[0_25px_60px_-20px_rgba(56,97,255,0.6)] backdrop-blur-[32px] transition-colors duration-700 ${gameAreaBackgroundClass}`}>
             <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(255,255,255,0.12),transparent_65%)]" />
 
@@ -383,50 +438,56 @@ export default function Home() {
           </section>
         </section>
 
-        {/* Player list */}
-        <section className="mt-6 space-y-3">
-          {players.map((player) => (
-            <div
-              key={player.name}
-              className="flex items-center justify-between rounded-2xl border border-white/10 bg-white/10 px-4 py-3 text-sm font-medium text-white/90 shadow-[0_15px_35px_-15px_rgba(41,88,255,0.6)] backdrop-blur-lg"
-            >
-              <div className="flex items-center gap-3">
-                <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-gradient-to-br from-white/25 to-white/5 text-lg">
-                  {player.icon}
+        {/* Player list - only show on game tab */}
+        {activeTab === 'game' && (
+          <section className="mt-6 space-y-3">
+            {players.map((player) => (
+              <div
+                key={player.name}
+                className="flex items-center justify-between rounded-2xl border border-white/10 bg-white/10 px-4 py-3 text-sm font-medium text-white/90 shadow-[0_15px_35px_-15px_rgba(41,88,255,0.6)] backdrop-blur-lg"
+              >
+                <div className="flex items-center gap-3">
+                  <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-gradient-to-br from-white/25 to-white/5 text-lg">
+                    {player.icon}
+                  </div>
+                  <div>
+                    <p className="text-base font-semibold">{player.name}</p>
+                    <p className="text-xs text-white/60">{player.status}</p>
+                  </div>
                 </div>
-                <div>
-                  <p className="text-base font-semibold">{player.name}</p>
-                  <p className="text-xs text-white/60">{player.status}</p>
-                </div>
+                <span className="text-base font-semibold text-blue-100">{player.amount}</span>
               </div>
-              <span className="text-base font-semibold text-blue-100">{player.amount}</span>
-            </div>
-          ))}
-        </section>
+            ))}
+          </section>
+        )}
       </div>
 
       {/* Bottom Navigation */}
       <nav className="fixed inset-x-0 bottom-0 z-30 mx-auto mb-4 w-[92%] max-w-md rounded-[28px] border border-white/10 bg-white/10 px-4 py-3 shadow-[0_25px_60px_-25px_rgba(0,0,0,0.7)] backdrop-blur-xl">
         <div className="flex items-center justify-between">
-          {NAV_ITEMS.map((item) => (
-            <button
-              key={item.label}
-              className={`flex flex-col items-center gap-1 text-xs font-medium transition ${
-                item.active ? 'text-white' : 'text-white/50'
-              }`}
-            >
-              <span
-                className={`flex h-10 w-10 items-center justify-center rounded-full ${
-                  item.active
-                    ? 'bg-gradient-to-br from-[#36B8FF] to-[#2478FF] shadow-[0_10px_25px_-10px_rgba(36,120,255,0.9)]'
-                    : 'bg-white/10'
-                } text-base`}
+          {NAV_ITEMS.map((item) => {
+            const isActive = activeTab === item.id
+            return (
+              <button
+                key={item.id}
+                onClick={() => setActiveTab(item.id)}
+                className={`flex flex-col items-center gap-1 text-xs font-medium transition ${
+                  isActive ? 'text-white' : 'text-white/50'
+                }`}
               >
-                {item.icon}
-              </span>
-              {item.label}
-            </button>
-          ))}
+                <span
+                  className={`flex h-10 w-10 items-center justify-center rounded-full transition ${
+                    isActive
+                      ? 'bg-gradient-to-br from-[#36B8FF] to-[#2478FF] shadow-[0_10px_25px_-10px_rgba(36,120,255,0.9)]'
+                      : 'bg-white/10'
+                  } text-base`}
+                >
+                  {item.icon}
+                </span>
+                {item.label}
+              </button>
+            )
+          })}
         </div>
       </nav>
     </main>
