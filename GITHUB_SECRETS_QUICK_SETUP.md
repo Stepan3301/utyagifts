@@ -7,14 +7,16 @@ Your app is trying to connect to `localhost:4000` which doesn't work in producti
 
 1. Go to your Railway project: https://railway.app
 2. Click on **@rocket-gifts/backend** service
-3. Go to **Settings** tab
-4. Scroll down to **Networking** section
-5. Copy the **Public Domain** URL (it looks like: `https://your-app-name.up.railway.app`)
-6. Add `/api` to the end: `https://your-app-name.up.railway.app/api`
+3. Go to **Settings** tab → **Networking** section
+4. Under **Public Networking**, find your domain (e.g., `rocket-giftsbackend-production.up.railway.app`)
+5. Copy the domain and add `https://` prefix and `/api` suffix
+6. **Important**: Do NOT include the port number (Railway handles that automatically)
 
-**Example:**
-- Railway gives you: `https://rocket-gifts-backend.up.railway.app`
-- Use as secret: `https://rocket-gifts-backend.up.railway.app/api`
+**Example from your Railway:**
+- Railway shows: `rocket-giftsbackend-production.up.railway.app` (Port 8080)
+- Use as secret: `https://rocket-giftsbackend-production.up.railway.app/api`
+- ✅ Correct format: `https://[domain].up.railway.app/api`
+- ❌ Wrong format: `https://[domain].up.railway.app:8080/api` (don't include port)
 
 ## Step 2: Add GitHub Secret
 

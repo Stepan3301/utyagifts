@@ -16,12 +16,32 @@ dotenv.config();
 const app = express();
 const PORT = process.env.PORT || 4000;
 
+// CORS configuration
+const corsOptions = {
+  origin: [
+    'https://stepan3301.github.io',
+    'https://stepan3301.github.io/utyagifts',
+    'http://localhost:3000',
+    'http://localhost:8000',
+    'http://localhost:8001',
+    'http://localhost:8002',
+  ],
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
+};
+
 // Middleware
-app.use(helmet());
-app.use(cors());
+app.use(helmet({
+  crossOriginResourcePolicy: { policy: 'cross-origin' },
+}));
+app.use(cors(corsOptions));
 app.use(morgan('combined'));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+
+// Handle OPTIONS requests for CORS preflight
+app.options('*', cors(corsOptions));
 
 // Routes
 app.use('/api/health', healthRouter);

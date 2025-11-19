@@ -33,9 +33,17 @@ export const authController = {
    */
   async registerUser(req: Request, res: Response): Promise<void> {
     try {
+      console.log('📥 Register user request received:', {
+        method: req.method,
+        url: req.url,
+        origin: req.headers.origin,
+        body: req.body,
+      });
+
       const { telegramId, username, firstName, lastName } = req.body;
 
       if (!telegramId || typeof telegramId !== 'number') {
+        console.warn('❌ Invalid telegramId:', telegramId);
         res.status(400).json({ error: 'telegramId is required and must be a number' });
         return;
       }
@@ -47,7 +55,9 @@ export const authController = {
         lastName: lastName || undefined,
       };
 
+      console.log('👤 Creating/updating user:', telegramUser);
       const user = await authService.getOrCreateUser(telegramUser);
+      console.log('✅ User registered successfully:', user.id);
 
       res.json({
         success: true,
@@ -60,7 +70,8 @@ export const authController = {
         },
       });
     } catch (error: any) {
-      console.error('Error registering user:', error);
+      console.error('❌ Error registering user:', error);
+      console.error('Error stack:', error.stack);
       res.status(500).json({ 
         error: 'Failed to register user',
         message: error.message 
