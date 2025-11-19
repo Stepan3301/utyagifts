@@ -23,6 +23,7 @@
     "morgan": "^1.10.0",
     "node-telegram-bot-api": "^0.66.0",
     "redis": "^4.6.13",
+    "typescript": "^5.3.3",
     "zod": "^3.23.8"
   },
   "devDependencies": {
@@ -34,8 +35,7 @@
     "@typescript-eslint/parser": "^7.2.0",
     "eslint": "^8.57.0",
     "prisma": "^5.19.0",
-    "tsx": "^4.7.1",
-    "typescript": "^5.3.3"
+    "tsx": "^4.7.1"
   }
 }
 
