@@ -345,12 +345,34 @@ export default function Home() {
     return index === -1 ? 0 : index
   }, [activeTab])
 
-  const indicatorStyle = useMemo(
-    () => ({
-      transform: `translateX(${activeIndex * 100}%)`,
-    }),
-    [activeIndex]
-  )
+  const [indicatorStyle, setIndicatorStyle] = useState<React.CSSProperties>({ transform: 'translateX(0)' })
+
+  // Update indicator position based on active tab
+  useEffect(() => {
+    if (!mounted) return
+
+    const updateIndicatorPosition = () => {
+      const activeItem = navItemsRef.current[activeIndex]
+      const nav = navRef.current
+      if (!activeItem || !nav) return
+
+      const navRect = nav.getBoundingClientRect()
+      const itemRect = activeItem.getBoundingClientRect()
+      const indicatorLeft = 4 // CSS left: 4px
+      const translateX = itemRect.left - navRect.left - indicatorLeft
+
+      setIndicatorStyle({
+        transform: `translateX(${translateX}px)`,
+      })
+    }
+
+    // Update immediately
+    updateIndicatorPosition()
+
+    // Update on window resize
+    window.addEventListener('resize', updateIndicatorPosition)
+    return () => window.removeEventListener('resize', updateIndicatorPosition)
+  }, [activeIndex, mounted])
 
   const launchLabel =
     sessionState === 'running'
@@ -705,13 +727,16 @@ export default function Home() {
       </div>
 
       {/* Bottom Navigation */}
-      <nav className="neo-nav" role="navigation" aria-label="Main navigation">
+      <nav ref={navRef} className="neo-nav" role="navigation" aria-label="Main navigation">
         <div className="nav-indicator" style={indicatorStyle} />
-        {NAV_ITEMS.map((item) => {
+        {NAV_ITEMS.map((item, index) => {
           const isActive = activeTab === item.id
           return (
             <button
               key={item.id}
+              ref={(el) => {
+                navItemsRef.current[index] = el
+              }}
               type="button"
               data-tab={item.id}
               onClick={() => setActiveTab(item.id)}

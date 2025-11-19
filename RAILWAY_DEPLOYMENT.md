@@ -19,9 +19,20 @@ Railway will detect both frontend and backend. You need to configure the backend
 4. Set **Build Command**: `npm install && npm run build`
 5. Set **Start Command**: `npm start`
 
-### 3. Set Environment Variables
+### 3. Remove Frontend Service (Important!)
 
-Go to **Variables** tab and add:
+Since you're deploying frontend to GitHub Pages, **remove the frontend service from Railway**:
+
+1. Click on **@rocket-gifts/frontend** service
+2. Go to **Settings** tab
+3. Scroll down and click **Delete Service**
+4. Confirm deletion
+
+This prevents Railway from trying to build your frontend (which is handled by GitHub Actions).
+
+### 4. Set Environment Variables
+
+Go to **Variables** tab in the **@rocket-gifts/backend** service and add:
 
 #### Required Variables:
 
@@ -44,7 +55,7 @@ TELEGRAM_WEBHOOK_URL=https://your-backend.railway.app/api/telegram/webhook
 NODE_ENV=production
 ```
 
-### 4. Deploy
+### 5. Deploy
 
 Railway will automatically:
 1. Install dependencies (`npm install`)
