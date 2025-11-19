@@ -38,6 +38,7 @@ jobs:
         run: npm run build
         env:
           NODE_ENV: production
+          GITHUB_PAGES: 'true'
           NEXT_PUBLIC_API_BASE_URL: ${{ secrets.NEXT_PUBLIC_API_BASE_URL || '' }}
           NEXT_PUBLIC_TELEGRAM_BOT_USERNAME: ${{ secrets.NEXT_PUBLIC_TELEGRAM_BOT_USERNAME || '' }}
 

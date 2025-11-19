@@ -100,6 +100,8 @@ export default function Home() {
   const [collectedMultiplier, setCollectedMultiplier] = useState<number | null>(null)
   const animationRef = useRef<LottieRefCurrentProps>(null)
   const crashTargetRef = useRef<number>(10)
+  const navRef = useRef<HTMLElement | null>(null)
+  const navItemsRef = useRef<(HTMLButtonElement | null)[]>([])
 
   useEffect(() => {
     if (typeof window === 'undefined') return
@@ -576,6 +578,7 @@ export default function Home() {
                 {/* Avatar */}
                 <div className="relative z-10 mb-6">
                   {telegramUser?.photo_url ? (
+                    // eslint-disable-next-line @next/next/no-img-element
                     <img
                       src={telegramUser.photo_url}
                       alt="Profile"
