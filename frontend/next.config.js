@@ -1,14 +1,15 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
-  // For GitHub Pages deployment
+  // For static export (GitHub Pages and Netlify)
   output: 'export',
   images: {
     unoptimized: true, // Required for static export
   },
-  // Base path for GitHub Pages (your repo name)
-  basePath: process.env.NODE_ENV === 'production' ? '/utyagifts' : '',
-  assetPrefix: process.env.NODE_ENV === 'production' ? '/utyagifts' : '',
+  // Base path only for GitHub Pages (not Netlify)
+  // Netlify hosts at root, GitHub Pages uses repo name
+  basePath: process.env.NODE_ENV === 'production' && process.env.GITHUB_PAGES === 'true' ? '/utyagifts' : '',
+  assetPrefix: process.env.NODE_ENV === 'production' && process.env.GITHUB_PAGES === 'true' ? '/utyagifts' : '',
 }
 
 module.exports = nextConfig

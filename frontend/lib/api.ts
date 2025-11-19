@@ -35,7 +35,19 @@ class ApiClient {
       }
 
       return await response.json()
-    } catch (error) {
+    } catch (error: any) {
+      // Handle network errors gracefully
+      if (error.name === 'TypeError' && error.message.includes('Failed to fetch')) {
+        const isLocalhost = this.baseUrl.includes('localhost') || this.baseUrl.includes('127.0.0.1')
+        if (isLocalhost) {
+          console.warn(
+            '⚠️ Backend server not available. Make sure backend is running on',
+            this.baseUrl.replace('/api', '')
+          )
+        } else {
+          console.error('⚠️ Cannot connect to backend API. Check your deployment configuration.')
+        }
+      }
       console.error('API request failed:', error)
       throw error
     }

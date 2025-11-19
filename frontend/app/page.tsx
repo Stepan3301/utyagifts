@@ -123,17 +123,25 @@ export default function Home() {
               firstName: user.first_name,
               lastName: user.last_name,
             })
-            console.log('User registered successfully')
-          } catch (error) {
-            console.error('Failed to register user:', error)
+            console.log('✅ User registered successfully')
+          } catch (error: any) {
             // Don't block app initialization if registration fails
+            // This is expected if backend is not deployed or not running
+            if (error.message?.includes('Failed to fetch')) {
+              console.warn(
+                '⚠️ User registration skipped: Backend server not available.',
+                'This is normal if backend is not deployed yet.'
+              )
+            } else {
+              console.error('Failed to register user:', error)
+            }
           }
         }
       } catch (error) {
         console.warn('Telegram WebApp SDK init failed, continuing in fallback mode.', error)
       }
 
-      setMounted(true)
+    setMounted(true)
     }
 
     initializeApp()

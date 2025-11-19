@@ -108,7 +108,22 @@ pnpm dev
 
 ## Production Deployment
 
-See `infra/` directory for deployment configurations.
+### GitHub Pages (Frontend)
+
+1. **Set up GitHub Secrets** (Required):
+   - Go to repository → Settings → Secrets and variables → Actions
+   - Add `NEXT_PUBLIC_API_BASE_URL` (your backend URL)
+   - See [GITHUB_SECRETS_SETUP.md](./GITHUB_SECRETS_SETUP.md) for detailed instructions
+
+2. **Deploy Backend Separately**:
+   - GitHub Pages only serves static files
+   - Deploy backend to Railway, Render, Fly.io, etc.
+   - Set backend environment variables on your hosting platform
+
+3. **See deployment guides**:
+   - [GITHUB_SECRETS_SETUP.md](./GITHUB_SECRETS_SETUP.md) - Environment variables setup
+   - [GITHUB_PAGES_DEPLOYMENT.md](./GITHUB_PAGES_DEPLOYMENT.md) - GitHub Pages setup
+   - `infra/` directory - Docker/Infrastructure configurations
 
 ## License
 
