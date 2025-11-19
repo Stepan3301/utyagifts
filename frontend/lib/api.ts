@@ -70,6 +70,12 @@ export const apiClient = new ApiClient(API_BASE_URL)
 export const authApi = {
   validateInitData: (initData: string) =>
     apiClient.post('/auth/validate', { initData }),
+  registerUser: (userData: {
+    telegramId: number
+    username?: string
+    firstName?: string
+    lastName?: string
+  }) => apiClient.post('/auth/register', userData),
 }
 
 // Inventory API

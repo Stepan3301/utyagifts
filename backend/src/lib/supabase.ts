@@ -18,104 +18,110 @@ export const supabase = createClient(
   }
 )
 
-// Database types (matching Prisma schema)
+// Database types (matching Supabase schema)
 export interface Database {
   public: {
     Tables: {
-      User: {
+      users: {
         Row: {
           id: string
-          telegramId: number
+          telegram_id: number
           username: string | null
-          firstName: string | null
-          lastName: string | null
-          createdAt: string
-          updatedAt: string
+          first_name: string | null
+          last_name: string | null
+          inventory: any // JSONB
+          created_at: string
+          updated_at: string
         }
         Insert: {
           id?: string
-          telegramId: number
+          telegram_id: number
           username?: string | null
-          firstName?: string | null
-          lastName?: string | null
-          createdAt?: string
-          updatedAt?: string
+          first_name?: string | null
+          last_name?: string | null
+          inventory?: any
+          created_at?: string
+          updated_at?: string
         }
         Update: {
           id?: string
-          telegramId?: number
+          telegram_id?: number
           username?: string | null
-          firstName?: string | null
-          lastName?: string | null
-          createdAt?: string
-          updatedAt?: string
+          first_name?: string | null
+          last_name?: string | null
+          inventory?: any
+          created_at?: string
+          updated_at?: string
         }
       }
-      Gift: {
+      gifts: {
         Row: {
           id: string
-          userId: string | null
-          telegramGiftId: string
-          name: string | null
-          thumbnail: string | null
-          status: string
-          createdAt: string
-          updatedAt: string
+          name: string
+          description: string | null
+          image_url: string | null
+          animation_url: string | null
+          external_url: string | null
+          rarity: string | null
+          created_at: string
+          updated_at: string
         }
         Insert: {
           id?: string
-          userId?: string | null
-          telegramGiftId: string
-          name?: string | null
-          thumbnail?: string | null
-          status?: string
-          createdAt?: string
-          updatedAt?: string
+          name: string
+          description?: string | null
+          image_url?: string | null
+          animation_url?: string | null
+          external_url?: string | null
+          rarity?: string | null
+          created_at?: string
+          updated_at?: string
         }
         Update: {
           id?: string
-          userId?: string | null
-          telegramGiftId?: string
-          name?: string | null
-          thumbnail?: string | null
-          status?: string
-          createdAt?: string
-          updatedAt?: string
+          name?: string
+          description?: string | null
+          image_url?: string | null
+          animation_url?: string | null
+          external_url?: string | null
+          rarity?: string | null
+          created_at?: string
+          updated_at?: string
         }
       }
-      GameSession: {
+      game_sessions: {
         Row: {
           id: string
-          userId: string
-          giftId: string
-          multiplier: number
+          user_id: string
+          gift_id: string | null
+          multiplier: number | null
           status: string
-          crashedAt: number | null
-          cashedOutAt: number | null
-          createdAt: string
-          updatedAt: string
+          crashed_at: string | null
+          cashed_out_at: string | null
+          created_at: string
+          updated_at: string
         }
         Insert: {
           id?: string
-          userId: string
-          giftId: string
-          multiplier: number
+          user_id: string
+          gift_id?: string | null
+          multiplier?: number | null
           status?: string
-          crashedAt?: number | null
-          cashedOutAt?: number | null
-          createdAt?: string
-          updatedAt?: string
+          crashed_at?: string | null
+          cashed_out_at?: string | null
+          created_at?: string
+          updated_at?: string
         }
         Update: {
           id?: string
-          userId?: string
-          giftId?: string
-          multiplier?: number
+          user_id?: string
+          gift_id?: string | null
+          multiplier?: number | null
           status?: string
-          crashedAt?: number | null
-          cashedOutAt?: number | null
-          createdAt?: string
-          updatedAt?: string
+          crashed_at?: string | null
+          cashed_out_at?: string | null
+          created_at?: string
+          updated_at?: string
         }
       }
     }
@@ -123,7 +129,7 @@ export interface Database {
 }
 
 // Type aliases for easier use
-export type User = Database['public']['Tables']['User']['Row']
-export type Gift = Database['public']['Tables']['Gift']['Row']
-export type GameSession = Database['public']['Tables']['GameSession']['Row']
+export type User = Database['public']['Tables']['users']['Row']
+export type Gift = Database['public']['Tables']['gifts']['Row']
+export type GameSession = Database['public']['Tables']['game_sessions']['Row']
 

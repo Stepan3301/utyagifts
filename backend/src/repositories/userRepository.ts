@@ -16,9 +16,9 @@ export interface UpdateUserData {
 class UserRepository {
   async findByTelegramId(telegramId: number): Promise<User | null> {
     const { data, error } = await supabase
-      .from('User')
+      .from('users')
       .select('*')
-      .eq('telegramId', telegramId)
+      .eq('telegram_id', telegramId)
       .single()
 
     if (error) {
@@ -34,7 +34,7 @@ class UserRepository {
 
   async findById(id: string): Promise<User | null> {
     const { data, error } = await supabase
-      .from('User')
+      .from('users')
       .select('*')
       .eq('id', id)
       .single()
@@ -52,12 +52,12 @@ class UserRepository {
 
   async create(data: CreateUserData): Promise<User> {
     const { data: user, error } = await supabase
-      .from('User')
+      .from('users')
       .insert({
-        telegramId: data.telegramId,
+        telegram_id: data.telegramId,
         username: data.username ?? null,
-        firstName: data.firstName ?? null,
-        lastName: data.lastName ?? null,
+        first_name: data.firstName ?? null,
+        last_name: data.lastName ?? null,
       })
       .select()
       .single()
@@ -71,12 +71,12 @@ class UserRepository {
 
   async update(id: string, data: UpdateUserData): Promise<User> {
     const { data: user, error } = await supabase
-      .from('User')
+      .from('users')
       .update({
         username: data.username ?? undefined,
-        firstName: data.firstName ?? undefined,
-        lastName: data.lastName ?? undefined,
-        updatedAt: new Date().toISOString(),
+        first_name: data.firstName ?? undefined,
+        last_name: data.lastName ?? undefined,
+        updated_at: new Date().toISOString(),
       })
       .eq('id', id)
       .select()

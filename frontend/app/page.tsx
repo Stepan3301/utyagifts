@@ -5,6 +5,7 @@ import WebApp from '@twa-dev/sdk'
 import Lottie, { type LottieRefCurrentProps } from 'lottie-react'
 
 import rocketAnimation from '@/public/animations/rocket.json'
+import { authApi } from '@/lib/api'
 
 const NAV_ITEMS: Array<{ label: string; id: string; icon: JSX.Element }> = [
   {
@@ -103,20 +104,39 @@ export default function Home() {
   useEffect(() => {
     if (typeof window === 'undefined') return
 
-    try {
-      WebApp.ready()
-      WebApp.expand()
+    const initializeApp = async () => {
+      try {
+        WebApp.ready()
+        WebApp.expand()
 
-      // Get Telegram user data
-      const initData = WebApp.initDataUnsafe
-      if (initData?.user) {
-        setTelegramUser(initData.user as TelegramUser)
+        // Get Telegram user data
+        const initData = WebApp.initDataUnsafe
+        if (initData?.user) {
+          const user = initData.user as TelegramUser
+          setTelegramUser(user)
+
+          // Register or update user in database
+          try {
+            await authApi.registerUser({
+              telegramId: user.id,
+              username: user.username,
+              firstName: user.first_name,
+              lastName: user.last_name,
+            })
+            console.log('User registered successfully')
+          } catch (error) {
+            console.error('Failed to register user:', error)
+            // Don't block app initialization if registration fails
+          }
+        }
+      } catch (error) {
+        console.warn('Telegram WebApp SDK init failed, continuing in fallback mode.', error)
       }
-    } catch (error) {
-      console.warn('Telegram WebApp SDK init failed, continuing in fallback mode.', error)
+
+      setMounted(true)
     }
 
-    setMounted(true)
+    initializeApp()
   }, [])
 
   useEffect(() => {
