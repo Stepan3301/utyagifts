@@ -1,4 +1,26 @@
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000/api'
+// Get API base URL from environment variable
+// In production (GitHub Pages), this must be set via GitHub Secrets
+// In development, defaults to localhost
+const getApiBaseUrl = () => {
+  // Check if we're in production (GitHub Pages)
+  if (typeof window !== 'undefined') {
+    const hostname = window.location.hostname
+    // If not localhost, we're in production and need the Railway backend URL
+    if (hostname !== 'localhost' && hostname !== '127.0.0.1') {
+      // In production, NEXT_PUBLIC_API_BASE_URL must be set
+      if (!process.env.NEXT_PUBLIC_API_BASE_URL) {
+        console.error(
+          '⚠️ NEXT_PUBLIC_API_BASE_URL is not set! ' +
+          'Please configure it in GitHub Secrets. ' +
+          'The app will not be able to connect to the backend.'
+        )
+      }
+    }
+  }
+  return process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000/api'
+}
+
+const API_BASE_URL = getApiBaseUrl()
 
 export interface ApiResponse<T> {
   success?: boolean

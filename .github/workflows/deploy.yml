@@ -33,13 +33,24 @@ jobs:
           # Install dependencies (will create package-lock.json if missing)
           npm install --legacy-peer-deps --no-audit --no-fund
 
+      - name: Validate GitHub Secrets
+        run: |
+          if [ -z "${{ secrets.NEXT_PUBLIC_API_BASE_URL }}" ]; then
+            echo "❌ ERROR: NEXT_PUBLIC_API_BASE_URL secret is not set!"
+            echo "Please go to: Settings → Secrets and variables → Actions"
+            echo "Add secret: NEXT_PUBLIC_API_BASE_URL = https://your-backend.railway.app/api"
+            echo "See GITHUB_SECRETS_QUICK_SETUP.md for instructions"
+            exit 1
+          fi
+          echo "✅ NEXT_PUBLIC_API_BASE_URL is set"
+
       - name: Build Next.js app
         working-directory: ./frontend
         run: npm run build
         env:
           NODE_ENV: production
           GITHUB_PAGES: 'true'
-          NEXT_PUBLIC_API_BASE_URL: ${{ secrets.NEXT_PUBLIC_API_BASE_URL || '' }}
+          NEXT_PUBLIC_API_BASE_URL: ${{ secrets.NEXT_PUBLIC_API_BASE_URL }}
           NEXT_PUBLIC_TELEGRAM_BOT_USERNAME: ${{ secrets.NEXT_PUBLIC_TELEGRAM_BOT_USERNAME || '' }}
 
       - name: Setup Pages
