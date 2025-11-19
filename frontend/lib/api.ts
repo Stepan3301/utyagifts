@@ -2,25 +2,41 @@
 // In production (GitHub Pages), this must be set via GitHub Secrets
 // In development, defaults to localhost
 const getApiBaseUrl = () => {
-  // Check if we're in production (GitHub Pages)
+  const envUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000/api'
+  
+  // Ensure the URL is absolute (starts with http:// or https://)
+  // This prevents Next.js basePath from affecting API calls
+  if (envUrl.startsWith('http://') || envUrl.startsWith('https://')) {
+    return envUrl
+  }
+  
+  // If relative URL provided, log warning and try to construct absolute URL
+  console.warn('⚠️ API URL should be absolute (start with http:// or https://). Got:', envUrl)
+  
+  // In production, construct absolute URL
   if (typeof window !== 'undefined') {
     const hostname = window.location.hostname
-    // If not localhost, we're in production and need the Railway backend URL
     if (hostname !== 'localhost' && hostname !== '127.0.0.1') {
-      // In production, NEXT_PUBLIC_API_BASE_URL must be set
-      if (!process.env.NEXT_PUBLIC_API_BASE_URL) {
-        console.error(
-          '⚠️ NEXT_PUBLIC_API_BASE_URL is not set! ' +
-          'Please configure it in GitHub Secrets. ' +
-          'The app will not be able to connect to the backend.'
-        )
-      }
+      // Production - should use Railway backend
+      console.error(
+        '⚠️ NEXT_PUBLIC_API_BASE_URL must be an absolute URL! ' +
+        'Please set it in GitHub Secrets as: https://your-backend.railway.app/api'
+      )
+      // Return the env URL anyway, but it will likely fail
+      return envUrl
     }
   }
-  return process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000/api'
+  
+  // Development - localhost is fine
+  return envUrl.startsWith('/') ? `http://localhost:4000${envUrl}` : `http://localhost:4000/${envUrl}`
 }
 
 const API_BASE_URL = getApiBaseUrl()
+
+// Log the API URL being used (for debugging)
+if (typeof window !== 'undefined') {
+  console.log('🔗 API Base URL:', API_BASE_URL)
+}
 
 export interface ApiResponse<T> {
   success?: boolean
@@ -39,7 +55,25 @@ class ApiClient {
     endpoint: string,
     options: RequestInit = {}
   ): Promise<T> {
-    const url = `${this.baseUrl}${endpoint}`
+    // Ensure endpoint starts with /
+    const normalizedEndpoint = endpoint.startsWith('/') ? endpoint : `/${endpoint}`
+    
+    // Construct full URL - ensure baseUrl is absolute
+    let url: string
+    if (this.baseUrl.startsWith('http://') || this.baseUrl.startsWith('https://')) {
+      // Absolute URL - use as-is
+      url = `${this.baseUrl}${normalizedEndpoint}`
+    } else {
+      // Relative URL - this shouldn't happen in production
+      console.error('⚠️ API base URL is not absolute:', this.baseUrl)
+      url = `${this.baseUrl}${normalizedEndpoint}`
+    }
+    
+    // Log the full URL for debugging (only in development)
+    if (typeof window !== 'undefined' && window.location.hostname === 'localhost') {
+      console.log('🌐 API Request:', url)
+    }
+    
     const headers = {
       'Content-Type': 'application/json',
       ...options.headers,

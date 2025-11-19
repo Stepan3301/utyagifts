@@ -35,14 +35,30 @@ jobs:
 
       - name: Validate GitHub Secrets
         run: |
-          if [ -z "${{ secrets.NEXT_PUBLIC_API_BASE_URL }}" ]; then
+          API_URL="${{ secrets.NEXT_PUBLIC_API_BASE_URL }}"
+          if [ -z "$API_URL" ]; then
             echo "❌ ERROR: NEXT_PUBLIC_API_BASE_URL secret is not set!"
             echo "Please go to: Settings → Secrets and variables → Actions"
             echo "Add secret: NEXT_PUBLIC_API_BASE_URL = https://your-backend.railway.app/api"
             echo "See GITHUB_SECRETS_QUICK_SETUP.md for instructions"
             exit 1
           fi
-          echo "✅ NEXT_PUBLIC_API_BASE_URL is set"
+          
+          # Validate URL format
+          if [[ ! "$API_URL" =~ ^https?:// ]]; then
+            echo "❌ ERROR: NEXT_PUBLIC_API_BASE_URL must start with http:// or https://"
+            echo "Current value: $API_URL"
+            echo "Expected format: https://rocket-giftsbackend-production.up.railway.app/api"
+            exit 1
+          fi
+          
+          if [[ ! "$API_URL" =~ /api$ ]]; then
+            echo "⚠️ WARNING: NEXT_PUBLIC_API_BASE_URL should end with /api"
+            echo "Current value: $API_URL"
+          fi
+          
+          echo "✅ NEXT_PUBLIC_API_BASE_URL is set correctly"
+          echo "   Value: $API_URL"
 
       - name: Build Next.js app
         working-directory: ./frontend
