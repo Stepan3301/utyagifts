@@ -19,5 +19,3 @@ export const telegramController = {
   },
 };
 
-export { telegramController as telegramWebhookController };
-

@@ -1,4 +1,4 @@
-import { supabase, type GameSession } from '../lib/supabase'
+import { supabase, type GameSession as DBGameSession } from '../lib/supabase'
 
 export interface CreateSessionData {
   userId: string
@@ -14,9 +14,9 @@ export interface UpdateSessionData {
 }
 
 class GameSessionRepository {
-  async findById(id: string): Promise<GameSession | null> {
+  async findById(id: string): Promise<DBGameSession | null> {
     const { data, error } = await supabase
-      .from('GameSession')
+      .from('game_sessions')
       .select('*')
       .eq('id', id)
       .single()
@@ -32,13 +32,13 @@ class GameSessionRepository {
     return data
   }
 
-  async findActiveByUserId(userId: string): Promise<GameSession | null> {
+  async findActiveByUserId(userId: string): Promise<DBGameSession | null> {
     const { data, error } = await supabase
-      .from('GameSession')
+      .from('game_sessions')
       .select('*')
-      .eq('userId', userId)
+      .eq('user_id', userId)
       .eq('status', 'active')
-      .order('createdAt', { ascending: false })
+      .order('created_at', { ascending: false })
       .limit(1)
       .single()
 
@@ -53,12 +53,12 @@ class GameSessionRepository {
     return data
   }
 
-  async findByUserId(userId: string, limit: number, offset: number): Promise<GameSession[]> {
+  async findByUserId(userId: string, limit: number, offset: number): Promise<DBGameSession[]> {
     const { data, error } = await supabase
-      .from('GameSession')
+      .from('game_sessions')
       .select('*')
-      .eq('userId', userId)
-      .order('createdAt', { ascending: false })
+      .eq('user_id', userId)
+      .order('created_at', { ascending: false })
       .range(offset, offset + limit - 1)
 
     if (error) {
@@ -68,12 +68,12 @@ class GameSessionRepository {
     return data ?? []
   }
 
-  async create(data: CreateSessionData): Promise<GameSession> {
+  async create(data: CreateSessionData): Promise<DBGameSession> {
     const { data: session, error } = await supabase
-      .from('GameSession')
+      .from('game_sessions')
       .insert({
-        userId: data.userId,
-        giftId: data.giftId,
+        user_id: data.userId,
+        gift_id: data.giftId,
         multiplier: data.multiplier,
         status: data.status,
       })
@@ -87,23 +87,23 @@ class GameSessionRepository {
     return session
   }
 
-  async update(id: string, data: UpdateSessionData): Promise<GameSession> {
+  async update(id: string, data: UpdateSessionData): Promise<DBGameSession> {
     const updateData: Record<string, unknown> = {
-      updatedAt: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
     }
 
     if (data.status !== undefined) {
       updateData.status = data.status
     }
     if (data.crashedAt !== undefined) {
-      updateData.crashedAt = data.crashedAt
+      updateData.crashed_at = new Date(data.crashedAt).toISOString()
     }
     if (data.cashedOutAt !== undefined) {
-      updateData.cashedOutAt = data.cashedOutAt
+      updateData.cashed_out_at = new Date(data.cashedOutAt).toISOString()
     }
 
     const { data: session, error } = await supabase
-      .from('GameSession')
+      .from('game_sessions')
       .update(updateData)
       .eq('id', id)
       .select()

@@ -1,7 +1,9 @@
 import { gameSessionRepository } from '../repositories/gameSessionRepository';
 import { giftService } from './giftService';
 import { poolService } from './poolService';
+import type { GameSession as DBGameSession } from '../lib/supabase';
 
+// Service-level interface (camelCase)
 export interface GameSession {
   id: string;
   userId: string;
@@ -11,6 +13,20 @@ export interface GameSession {
   cashedOutAt?: number;
   status: 'active' | 'crashed' | 'cashed_out';
   createdAt: Date;
+}
+
+// Helper to convert database row to service interface
+function mapGameSession(dbSession: DBGameSession): GameSession {
+  return {
+    id: dbSession.id,
+    userId: dbSession.user_id,
+    giftId: dbSession.gift_id || '',
+    multiplier: dbSession.multiplier ? Number(dbSession.multiplier) : 0,
+    crashedAt: dbSession.crashed_at ? new Date(dbSession.crashed_at).getTime() : undefined,
+    cashedOutAt: dbSession.cashed_out_at ? new Date(dbSession.cashed_out_at).getTime() : undefined,
+    status: dbSession.status as 'active' | 'crashed' | 'cashed_out',
+    createdAt: new Date(dbSession.created_at),
+  };
 }
 
 class GameService {
@@ -34,7 +50,7 @@ class GameService {
   async startSession(userId: string, giftId: string): Promise<GameSession> {
     // Verify gift ownership
     const gift = await giftService.getGiftById(giftId, userId);
-    if (!gift || gift.status !== 'owned') {
+    if (!gift) {
       throw new Error('Invalid gift or not owned');
     }
 
@@ -45,25 +61,27 @@ class GameService {
     const crashPoint = this.generateCrashPoint();
 
     // Create session
-    const session = await gameSessionRepository.create({
+    const dbSession = await gameSessionRepository.create({
       userId,
       giftId,
       multiplier: crashPoint,
       status: 'active',
     });
 
-    return session;
+    return mapGameSession(dbSession);
   }
 
   /**
    * Cash out from current session
    */
   async cashOut(userId: string, sessionId: string) {
-    const session = await gameSessionRepository.findById(sessionId);
+    const dbSession = await gameSessionRepository.findById(sessionId);
 
-    if (!session || session.userId !== userId) {
+    if (!dbSession || dbSession.user_id !== userId) {
       throw new Error('Session not found');
     }
+
+    const session = mapGameSession(dbSession);
 
     if (session.status !== 'active') {
       throw new Error('Session is not active');
@@ -101,25 +119,29 @@ class GameService {
    * Get active session for user
    */
   async getActiveSession(userId: string): Promise<GameSession | null> {
-    return await gameSessionRepository.findActiveByUserId(userId);
+    const dbSession = await gameSessionRepository.findActiveByUserId(userId);
+    return dbSession ? mapGameSession(dbSession) : null;
   }
 
   /**
    * Get session history
    */
-  async getSessionHistory(userId: string, limit: number, offset: number) {
-    return await gameSessionRepository.findByUserId(userId, limit, offset);
+  async getSessionHistory(userId: string, limit: number, offset: number): Promise<GameSession[]> {
+    const dbSessions = await gameSessionRepository.findByUserId(userId, limit, offset);
+    return dbSessions.map(mapGameSession);
   }
 
   /**
    * Check if session should crash (called periodically)
    */
   async checkCrash(sessionId: string): Promise<boolean> {
-    const session = await gameSessionRepository.findById(sessionId);
+    const dbSession = await gameSessionRepository.findById(sessionId);
     
-    if (!session || session.status !== 'active') {
+    if (!dbSession || dbSession.status !== 'active') {
       return false;
     }
+
+    const session = mapGameSession(dbSession);
 
     // Simplified: check if current time has passed crash point
     // In real implementation, this would check current multiplier vs crash point

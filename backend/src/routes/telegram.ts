@@ -1,8 +1,8 @@
 import { Router } from 'express';
-import { telegramWebhookController } from '../controllers/telegramController';
+import { telegramController } from '../controllers/telegramController';
 
 export const telegramRouter = Router();
 
 // Telegram webhook endpoint
-telegramRouter.post('/webhook', telegramWebhookController);
+telegramRouter.post('/webhook', telegramController.telegramWebhook);
 

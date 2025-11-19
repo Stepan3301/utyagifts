@@ -5,7 +5,7 @@ class PoolService {
   /**
    * Add gift to pool
    */
-  async addGift(giftId: string): Promise<void> {
+  async addGift(_giftId: string): Promise<void> {
     // Gift is already moved to pool in giftService
     // This service manages pool logic
   }
@@ -13,14 +13,14 @@ class PoolService {
   /**
    * Remove gift from pool
    */
-  async removeGift(giftId: string): Promise<void> {
+  async removeGift(_giftId: string): Promise<void> {
     // Gift is already moved to user in giftService
   }
 
   /**
    * Get random gift(s) from pool based on value
    */
-  async getRandomGift(value: number): Promise<string | null> {
+  async getRandomGift(_value: number): Promise<string | null> {
     // Get gifts from pool
     const poolGifts = await giftRepository.findByStatus(GiftStatus.IN_POOL);
 

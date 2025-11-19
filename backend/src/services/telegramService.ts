@@ -44,7 +44,7 @@ class TelegramService {
   private setupHandlers(): void {
     if (!this.bot) return;
 
-    this.bot.onText(/\/start/, async (msg) => {
+    this.bot.onText(/\/start/, async (msg: any) => {
       try {
         const chatId = msg.chat.id;
         const webappUrl = process.env.WEBAPP_URL || process.env.NEXT_PUBLIC_API_BASE_URL?.replace('/api', '') || 'http://localhost:3000';
@@ -68,7 +68,7 @@ class TelegramService {
     });
 
     // Handle gift updates (when user sends gift to relayer)
-    this.bot.on('message', async (msg) => {
+    this.bot.on('message', async (msg: any) => {
       // Check if message contains a gift
       if (msg.gift) {
         await this.handleGiftReceived(msg);
@@ -76,11 +76,11 @@ class TelegramService {
     });
 
     // Error handling
-    this.bot.on('error', (error) => {
+    this.bot.on('error', (error: any) => {
       console.error('Telegram bot error:', error);
     });
 
-    this.bot.on('polling_error', (error) => {
+    this.bot.on('polling_error', (error: any) => {
       console.error('Telegram polling error:', error);
     });
   }
@@ -97,7 +97,8 @@ class TelegramService {
       
       // Use bot's request method to call setChatMenuButton API
       // This sets the menu button globally for all users
-      await this.bot.request('setChatMenuButton', {
+      // Note: request method exists but isn't in TypeScript types
+      await (this.bot as any).request('setChatMenuButton', {
         menu_button: {
           type: 'web_app',
           text: '🚀 Launch App',
@@ -169,7 +170,7 @@ class TelegramService {
   /**
    * Send gift to user
    */
-  async sendGift(userTelegramId: number, giftId: string): Promise<void> {
+  async sendGift(_userTelegramId: number, _giftId: string): Promise<void> {
     if (!this.bot) {
       throw new Error('Bot not initialized');
     }

@@ -35,9 +35,16 @@ class GiftService {
   async getGiftById(giftId: string, userId: string) {
     const gift = await giftRepository.findById(giftId);
     
-    // Verify ownership
-    if (gift && gift.userId === userId) {
-      return gift;
+    if (!gift) {
+      return null;
+    }
+
+    // Verify ownership by checking user_gifts table
+    const userGifts = await giftRepository.findByUserId(userId);
+    const isOwned = userGifts.some((g) => g.id === giftId);
+    
+    if (isOwned) {
+      return { ...gift, status: GiftStatus.OWNED };
     }
     
     return null;

@@ -10,10 +10,10 @@ export interface TelegramUser {
 class AuthService {
   /**
    * Validates Telegram WebApp initData
-   * @param initData - Telegram initData string
+   * @param _initData - Telegram initData string
    * @returns Authenticated user
    */
-  async validateTelegramInitData(initData: string): Promise<TelegramUser> {
+  async validateTelegramInitData(_initData: string): Promise<TelegramUser> {
     // TODO: Implement proper Telegram initData validation
     // This involves:
     // 1. Parsing the initData string
