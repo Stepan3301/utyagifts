@@ -13,6 +13,8 @@ export interface UpdateGiftData {
   userId?: string | null
   status?: GiftStatus
   name?: string
+  animationData?: any // Lottie JSON object
+  giftUrl?: string // Telegram gift URL
 }
 
 class GiftRepository {
@@ -112,6 +114,14 @@ class GiftRepository {
 
     if (data.name !== undefined) {
       updateData.name = data.name
+    }
+
+    if (data.animationData !== undefined) {
+      updateData.animation_data = data.animationData
+    }
+
+    if (data.giftUrl !== undefined) {
+      updateData.gift_url = data.giftUrl
     }
 
     const { data: gift, error } = await supabase

@@ -152,6 +152,14 @@ export const inventoryApi = {
   getGift: (giftId: string) => apiClient.get(`/inventory/${giftId}`),
 }
 
+// Gift Processing API
+export const giftProcessingApi = {
+  processGiftUrl: (giftUrl: string) =>
+    apiClient.post('/gifts/process', { giftUrl }),
+  processAndUpdateGift: (giftId: string, giftUrl: string) =>
+    apiClient.post('/gifts/process-and-update', { giftId, giftUrl }),
+}
+
 // Game API
 export const gameApi = {
   startSession: (giftId: string) =>

@@ -61,6 +61,8 @@ export interface Database {
           description: string | null
           image_url: string | null
           animation_url: string | null
+          animation_data: any | null // JSONB for Lottie JSON
+          gift_url: string | null // Telegram gift URL
           external_url: string | null
           rarity: string | null
           created_at: string
@@ -72,6 +74,8 @@ export interface Database {
           description?: string | null
           image_url?: string | null
           animation_url?: string | null
+          animation_data?: any | null
+          gift_url?: string | null
           external_url?: string | null
           rarity?: string | null
           created_at?: string
@@ -83,6 +87,8 @@ export interface Database {
           description?: string | null
           image_url?: string | null
           animation_url?: string | null
+          animation_data?: any | null
+          gift_url?: string | null
           external_url?: string | null
           rarity?: string | null
           created_at?: string

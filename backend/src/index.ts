@@ -9,6 +9,7 @@ import { authRouter } from './routes/auth';
 import { inventoryRouter } from './routes/inventory';
 import { gameRouter } from './routes/game';
 import { healthRouter } from './routes/health';
+import { giftProcessingRouter } from './routes/giftProcessing';
 import { telegramService } from './services/telegramService';
 
 dotenv.config();
@@ -49,6 +50,7 @@ app.use('/api/telegram', telegramRouter);
 app.use('/api/auth', authRouter);
 app.use('/api/inventory', inventoryRouter);
 app.use('/api/game', gameRouter);
+app.use('/api/gifts', giftProcessingRouter);
 
 // Error handling
 app.use(errorHandler);

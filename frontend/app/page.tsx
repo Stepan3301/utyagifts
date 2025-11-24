@@ -5,7 +5,7 @@ import WebApp from '@twa-dev/sdk'
 import Lottie, { type LottieRefCurrentProps } from 'lottie-react'
 
 import rocketAnimation from '@/public/animations/rocket.json'
-import { authApi } from '@/lib/api'
+import { authApi, inventoryApi, giftProcessingApi } from '@/lib/api'
 
 const NAV_ITEMS: Array<{ label: string; id: string; icon: JSX.Element }> = [
   {
@@ -98,6 +98,8 @@ export default function Home() {
   const [currentMultiplier, setCurrentMultiplier] = useState(1)
   const [targetCrashMultiplier, setTargetCrashMultiplier] = useState<number | null>(null)
   const [collectedMultiplier, setCollectedMultiplier] = useState<number | null>(null)
+  const [inventory, setInventory] = useState<any[]>([])
+  const [loadingInventory, setLoadingInventory] = useState(false)
   const animationRef = useRef<LottieRefCurrentProps>(null)
   const crashTargetRef = useRef<number>(10)
   const navRef = useRef<HTMLElement | null>(null)
@@ -155,6 +157,26 @@ export default function Home() {
     const timeout = setTimeout(() => setBeamAnimation(true), 300)
     return () => clearTimeout(timeout)
   }, [mounted])
+
+  // Fetch inventory when gifts tab is active
+  useEffect(() => {
+    if (activeTab === 'gifts' && mounted && telegramUser) {
+      const fetchInventory = async () => {
+        try {
+          setLoadingInventory(true)
+          const response = await inventoryApi.getInventory()
+          const gifts = response.inventory || []
+          setInventory(gifts)
+        } catch (error) {
+          console.error('Failed to fetch inventory:', error)
+          setInventory([])
+        } finally {
+          setLoadingInventory(false)
+        }
+      }
+      fetchInventory()
+    }
+  }, [activeTab, mounted, telegramUser])
 
   const gradientOverlay = useMemo(
     () =>
@@ -513,25 +535,53 @@ export default function Home() {
                 <div className="relative z-10">
                   <h1 className="text-3xl font-bold text-white mb-6">Your Gifts 🎁</h1>
                   
-                  <div className="space-y-4">
+                  {loadingInventory ? (
+                    <div className="text-center py-12">
+                      <div className="text-6xl mb-4 animate-pulse">🎁</div>
+                      <p className="text-white/70 text-lg">Loading gifts...</p>
+                    </div>
+                  ) : inventory.length === 0 ? (
                     <div className="text-center py-12">
                       <div className="text-6xl mb-4">🎁</div>
                       <p className="text-white/70 text-lg mb-2">No gifts yet</p>
                       <p className="text-white/50 text-sm">Play the game to collect amazing gifts!</p>
                     </div>
-                  </div>
-                  
-                  {/* Placeholder for future gift grid */}
-                  <div className="mt-6 grid grid-cols-2 gap-4 opacity-50">
-                    {[1, 2, 3, 4].map((i) => (
-                      <div
-                        key={i}
-                        className="rounded-2xl border border-white/10 bg-white/5 aspect-square flex items-center justify-center backdrop-blur-lg"
-                      >
-                        <span className="text-4xl">🎁</span>
-                      </div>
-                    ))}
-                  </div>
+                  ) : (
+                    <div className="grid grid-cols-2 gap-4">
+                      {inventory.map((gift) => (
+                        <div
+                          key={gift.id}
+                          className="relative rounded-2xl border border-white/10 bg-white/5 aspect-square overflow-hidden backdrop-blur-lg hover:bg-white/10 transition-all"
+                        >
+                          {gift.animation_data ? (
+                            <div className="w-full h-full flex items-center justify-center p-2">
+                              <Lottie
+                                animationData={gift.animation_data}
+                                loop={true}
+                                autoplay={true}
+                                style={{ width: '100%', height: '100%' }}
+                              />
+                            </div>
+                          ) : gift.image_url ? (
+                            <img
+                              src={gift.image_url}
+                              alt={gift.name || 'Gift'}
+                              className="w-full h-full object-contain p-2"
+                            />
+                          ) : (
+                            <div className="w-full h-full flex items-center justify-center">
+                              <span className="text-4xl">🎁</span>
+                            </div>
+                          )}
+                          {gift.name && (
+                            <div className="absolute bottom-0 left-0 right-0 bg-black/60 backdrop-blur-sm px-2 py-1">
+                              <p className="text-white text-xs font-medium truncate">{gift.name}</p>
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
               </div>
             </section>
