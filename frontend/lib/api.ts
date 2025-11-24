@@ -146,10 +146,43 @@ export const authApi = {
   }) => apiClient.post('/auth/register', userData),
 }
 
+// Inventory API types
+export interface InventoryResponse {
+  inventory: Array<{
+    id: string
+    name: string | null
+    description: string | null
+    image_url: string | null
+    animation_url: string | null
+    animation_data: any | null
+    gift_url: string | null
+    external_url: string | null
+    rarity: string | null
+    created_at: string
+    updated_at: string
+  }>
+}
+
+export interface GiftResponse {
+  gift: {
+    id: string
+    name: string | null
+    description: string | null
+    image_url: string | null
+    animation_url: string | null
+    animation_data: any | null
+    gift_url: string | null
+    external_url: string | null
+    rarity: string | null
+    created_at: string
+    updated_at: string
+  }
+}
+
 // Inventory API
 export const inventoryApi = {
-  getInventory: () => apiClient.get('/inventory'),
-  getGift: (giftId: string) => apiClient.get(`/inventory/${giftId}`),
+  getInventory: () => apiClient.get<InventoryResponse>('/inventory'),
+  getGift: (giftId: string) => apiClient.get<GiftResponse>(`/inventory/${giftId}`),
 }
 
 // Gift Processing API

@@ -5,7 +5,9 @@ import WebApp from '@twa-dev/sdk'
 import Lottie, { type LottieRefCurrentProps } from 'lottie-react'
 
 import rocketAnimation from '@/public/animations/rocket.json'
-import { authApi, inventoryApi, giftProcessingApi } from '@/lib/api'
+import { authApi, inventoryApi, giftProcessingApi, type InventoryResponse } from '@/lib/api'
+
+type Gift = InventoryResponse['inventory'][number]
 
 const NAV_ITEMS: Array<{ label: string; id: string; icon: JSX.Element }> = [
   {
@@ -98,7 +100,7 @@ export default function Home() {
   const [currentMultiplier, setCurrentMultiplier] = useState(1)
   const [targetCrashMultiplier, setTargetCrashMultiplier] = useState<number | null>(null)
   const [collectedMultiplier, setCollectedMultiplier] = useState<number | null>(null)
-  const [inventory, setInventory] = useState<any[]>([])
+  const [inventory, setInventory] = useState<Gift[]>([])
   const [loadingInventory, setLoadingInventory] = useState(false)
   const animationRef = useRef<LottieRefCurrentProps>(null)
   const crashTargetRef = useRef<number>(10)
@@ -164,7 +166,7 @@ export default function Home() {
       const fetchInventory = async () => {
         try {
           setLoadingInventory(true)
-          const response = await inventoryApi.getInventory()
+          const response: InventoryResponse = await inventoryApi.getInventory()
           const gifts = response.inventory || []
           setInventory(gifts)
         } catch (error) {
