@@ -289,9 +289,24 @@ export default function Home() {
       if (!isRunningRef.current) return
 
       const elapsedSeconds = (timestamp - sessionStartTimeRef.current) / 1000
-      // Proportional growth: value = startValue * (ratePerSecond ^ elapsedSeconds)
-      const ratePerSecond = 1.35
-      const next = parseFloat((1 * Math.pow(ratePerSecond, elapsedSeconds)).toFixed(2))
+      
+      // Slow growth from 1x to 2x (takes ~3.75 seconds)
+      // After 2x, growth accelerates faster and faster
+      let next: number
+      if (elapsedSeconds < 3.75) {
+        // Phase 1: Slow growth from 1x to 2x
+        // Using easing: 2 = 1 * rate^3.75, so rate = 2^(1/3.75) ≈ 1.189
+        const slowRate = Math.pow(2, 1 / 3.75)
+        next = parseFloat((1 * Math.pow(slowRate, elapsedSeconds)).toFixed(2))
+      } else {
+        // Phase 2: Accelerating growth after 2x
+        // Calculate how much time has passed since reaching 2x
+        const timeAfter2x = elapsedSeconds - 3.75
+        // Use accelerating rate: exponential increase for "faster and faster" effect
+        // Base rate starts at 1.35 and increases exponentially with time
+        const acceleratingRate = 1.35 * Math.pow(1.15, timeAfter2x) // Rate increases exponentially
+        next = parseFloat((2 * Math.pow(acceleratingRate, timeAfter2x)).toFixed(2))
+      }
 
       if (next >= crashTargetRef.current) {
         isRunningRef.current = false
