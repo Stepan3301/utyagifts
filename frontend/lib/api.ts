@@ -115,15 +115,36 @@ class ApiClient {
     // Get Telegram initData for authentication
     const initData = this.getInitData()
     
-    const headers: HeadersInit = {
+    // Build headers object with proper typing
+    // Convert options.headers to a plain object if needed
+    const baseHeaders: Record<string, string> = {
       'Content-Type': 'application/json',
-      ...options.headers,
+    }
+    
+    // Merge existing headers if provided
+    if (options.headers) {
+      if (options.headers instanceof Headers) {
+        // Convert Headers object to plain object
+        options.headers.forEach((value, key) => {
+          baseHeaders[key] = value
+        })
+      } else if (Array.isArray(options.headers)) {
+        // Convert array of tuples to plain object
+        options.headers.forEach(([key, value]) => {
+          baseHeaders[key] = value
+        })
+      } else {
+        // It's already a Record<string, string>
+        Object.assign(baseHeaders, options.headers)
+      }
     }
     
     // Add Authorization header if initData is available
     if (initData) {
-      headers['Authorization'] = `Bearer ${initData}`
+      baseHeaders['Authorization'] = `Bearer ${initData}`
     }
+    
+    const headers: HeadersInit = baseHeaders
 
     try {
       const response = await fetch(url, {
