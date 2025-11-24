@@ -51,6 +51,44 @@ class ApiClient {
     this.baseUrl = baseUrl
   }
 
+  /**
+   * Get Telegram initData for authentication
+   */
+  private getInitData(): string | null {
+    if (typeof window === 'undefined') return null
+    
+    // Try to get initData from Telegram WebApp SDK
+    try {
+      // Access Telegram WebApp SDK
+      // @ts-ignore - Telegram WebApp SDK global
+      const WebApp = window.Telegram?.WebApp || (window as any).Telegram?.WebApp
+      
+      if (!WebApp) {
+        return null
+      }
+      
+      // First try to get the actual initData string (for production)
+      // This is the raw initData string that Telegram provides
+      if (WebApp.initData && typeof WebApp.initData === 'string' && WebApp.initData.length > 0) {
+        return WebApp.initData
+      }
+      
+      // Fallback: if initData string is not available, use initDataUnsafe to create a simple auth token
+      // This works for development/testing when initData might not be available
+      // Note: In production Telegram WebApp, initData should always be available
+      if (WebApp.initDataUnsafe?.user?.id) {
+        const userId = WebApp.initDataUnsafe.user.id
+        // Create a simple token format that the backend can parse
+        // Format: "telegram_user_<id>"
+        return `telegram_user_${userId}`
+      }
+    } catch (error) {
+      console.warn('Failed to get Telegram initData:', error)
+    }
+    
+    return null
+  }
+
   private async request<T>(
     endpoint: string,
     options: RequestInit = {}
@@ -74,9 +112,17 @@ class ApiClient {
       console.log('🌐 API Request:', url)
     }
     
-    const headers = {
+    // Get Telegram initData for authentication
+    const initData = this.getInitData()
+    
+    const headers: HeadersInit = {
       'Content-Type': 'application/json',
       ...options.headers,
+    }
+    
+    // Add Authorization header if initData is available
+    if (initData) {
+      headers['Authorization'] = `Bearer ${initData}`
     }
 
     try {

@@ -169,14 +169,21 @@ export default function Home() {
           const response: InventoryResponse = await inventoryApi.getInventory()
           const gifts = response.inventory || []
           setInventory(gifts)
-        } catch (error) {
+        } catch (error: any) {
           console.error('Failed to fetch inventory:', error)
+          // Don't show error if it's an auth issue - user might not be authenticated yet
+          if (error.message?.includes('Unauthorized')) {
+            console.warn('⚠️ Authentication required to view inventory')
+          }
           setInventory([])
         } finally {
           setLoadingInventory(false)
         }
       }
       fetchInventory()
+    } else if (activeTab !== 'gifts') {
+      // Clear inventory when switching away from gifts tab
+      setInventory([])
     }
   }, [activeTab, mounted, telegramUser])
 
