@@ -11,6 +11,7 @@ import { gameRouter } from './routes/game';
 import { healthRouter } from './routes/health';
 import { giftProcessingRouter } from './routes/giftProcessing';
 import { telegramService } from './services/telegramService';
+import { giftProcessingService } from './services/giftProcessingService';
 
 dotenv.config();
 
@@ -69,5 +70,18 @@ telegramService.initialize().catch((error) => {
 app.listen(PORT, () => {
   console.log(`🚀 Server running on port ${PORT}`);
   console.log(`📱 Environment: ${process.env.NODE_ENV || 'development'}`);
+});
+
+// Cleanup on shutdown
+process.on('SIGTERM', async () => {
+  console.log('SIGTERM received, cleaning up...');
+  await giftProcessingService.cleanup();
+  process.exit(0);
+});
+
+process.on('SIGINT', async () => {
+  console.log('SIGINT received, cleaning up...');
+  await giftProcessingService.cleanup();
+  process.exit(0);
 });
 

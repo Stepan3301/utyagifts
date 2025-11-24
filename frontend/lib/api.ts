@@ -258,6 +258,8 @@ export const giftProcessingApi = {
     apiClient.post('/gifts/process', { giftUrl }),
   processAndUpdateGift: (giftId: string, giftUrl: string) =>
     apiClient.post('/gifts/process-and-update', { giftId, giftUrl }),
+  processAllUnprocessed: () =>
+    apiClient.post('/gifts/process-all', {}),
 }
 
 // Game API

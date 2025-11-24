@@ -13,3 +13,6 @@ giftProcessingRouter.post('/process', giftProcessingController.processGiftUrl);
 // Process and update an existing gift with animation data
 giftProcessingRouter.post('/process-and-update', giftProcessingController.processAndUpdateGift);
 
+// Process all unprocessed gifts for the authenticated user
+giftProcessingRouter.post('/process-all', giftProcessingController.processAllUnprocessedGifts);
+

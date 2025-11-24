@@ -1,0 +1,120 @@
+// download_tgs_dom.js
+// Использование:
+//   node download_tgs_dom.js "https://t.me/nft/SpringBasket-524"
+
+const puppeteer = require("puppeteer");
+const axios = require("axios");
+const fs = require("fs");
+const path = require("path");
+
+async function main() {
+  const nftUrl = process.argv[2];
+
+  if (!nftUrl) {
+    console.error("❌ Укажи ссылку на NFT, например:");
+    console.error('   node download_tgs_dom.js "https://t.me/nft/SpringBasket-524"');
+    process.exit(1);
+  }
+
+  console.log("🔗 NFT URL:", nftUrl);
+
+  // Установка пути к исполняемому файлу Chrome для Puppeteer
+  // Это может быть необходимо в некоторых средах, но в нашей среде Puppeteer
+  // должен найти его автоматически. Оставляем как есть.
+  const browser = await puppeteer.launch({
+    headless: true,
+    args: ['--no-sandbox', '--disable-setuid-sandbox'], // Добавляем аргументы для работы в изолированной среде
+  });
+
+  try {
+    const page = await browser.newPage();
+
+    // Установка User-Agent
+    await page.setUserAgent(
+      "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) " +
+        "AppleWebKit/537.36 (KHTML, like Gecko) " +
+        "Chrome/120.0.0.0 Safari/537.36"
+    );
+
+    console.log("🌐 Открываю страницу...");
+    // Увеличиваем таймаут на всякий случай
+    await page.goto(nftUrl, {
+      waitUntil: "networkidle2",
+      timeout: 90_000, // Увеличиваем таймаут до 90 секунд
+    });
+
+    // *****************************************************************
+    // ИСПРАВЛЕНИЕ:
+    // Селектор 'source[type="application/tgsticker"]' неверен.
+    // Согласно скриншоту, правильный тип - 'application/x-tgsticker'.
+    // *****************************************************************
+    const selector = 'source[type="application/x-tgsticker"]';
+
+    console.log(`⏳ Жду, пока появится тег ${selector}...`);
+    await page.waitForSelector(selector, {
+      timeout: 60_000,
+    });
+
+    // Берём srcset (или src) у этого source
+    // *****************************************************************
+    // ИСПРАВЛЕНИЕ:
+    // Атрибут для .tgs файла - 'srcset', а не 'src'.
+    // Внутри $eval нужно использовать element.getAttribute('srcset').
+    // *****************************************************************
+    const tgsUrl = await page.$eval(
+      selector,
+      (el) => el.getAttribute('srcset')
+    );
+
+    if (!tgsUrl) {
+      console.error("❌ Не удалось получить ссылку .tgs из DOM");
+      process.exit(1);
+    }
+
+    // srcset теоретически может содержать несколько значений, берём первое
+    // *****************************************************************
+    // ИСПРАВЛЕНИЕ:
+    // Упрощаем логику, так как в srcset обычно только один URL.
+    // Если есть пробелы, это может быть связано с "URL Xw", но здесь,
+    // судя по скриншоту, это просто URL.
+    // *****************************************************************
+    const finalTgsUrl = tgsUrl.split(",")[0].trim().split(" ")[0].trim();
+
+    console.log("✅ Нашли .tgs с токеном:");
+    console.log(finalTgsUrl);
+
+    console.log("💾 Скачиваю .tgs...");
+    // *****************************************************************
+    // ИСПРАВЛЕНИЕ:
+    // Добавляем заголовок User-Agent для запроса Axios, чтобы избежать
+    // блокировки со стороны сервера CDN.
+    // *****************************************************************
+    const resp = await axios.get(finalTgsUrl, {
+      responseType: "arraybuffer",
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+      }
+    });
+
+    const urlPath = new URL(finalTgsUrl).pathname;
+    let fileName = path.basename(urlPath);
+    // Убедимся, что имя файла корректно, даже если оно содержит токен
+    if (fileName.includes('?')) {
+        fileName = fileName.split('?')[0];
+    }
+    if (!fileName.toLowerCase().endsWith(".tgs")) {
+      fileName += ".tgs";
+    }
+
+    const outputPath = path.join(process.cwd(), fileName);
+    fs.writeFileSync(outputPath, Buffer.from(resp.data));
+
+    console.log("🎉 Готово! Файл сохранён как:", outputPath);
+  } catch (err) {
+    console.error("❌ Ошибка:", err.message);
+  } finally {
+    await browser.close();
+  }
+}
+
+main();

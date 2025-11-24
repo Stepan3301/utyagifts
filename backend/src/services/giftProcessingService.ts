@@ -1,5 +1,6 @@
 import axios from 'axios';
 import * as pako from 'pako';
+import puppeteer, { Browser, Page } from 'puppeteer';
 
 export interface ProcessedGiftData {
   animationData: any; // Lottie JSON object
@@ -7,13 +8,106 @@ export interface ProcessedGiftData {
 }
 
 class GiftProcessingService {
+  private browser: Browser | null = null;
+  private browserPromise: Promise<Browser> | null = null;
+
   /**
-   * Extract .tgs URL from HTML page
+   * Get or create a browser instance (reused for efficiency)
    */
-  private extractTgsUrl(html: string): string | null {
-    // Look for .tgs URLs in the HTML
-    const match = html.match(/https?:\/\/[^\s"']+\.tgs/);
-    return match ? match[0] : null;
+  private async getBrowser(): Promise<Browser> {
+    if (this.browser) {
+      return this.browser;
+    }
+
+    if (this.browserPromise) {
+      return this.browserPromise;
+    }
+
+    // Use system Chromium on Railway, bundled Chromium in development
+    const executablePath = process.env.PUPPETEER_EXECUTABLE_PATH || undefined;
+    
+    this.browserPromise = puppeteer.launch({
+      headless: true,
+      executablePath,
+      args: [
+        '--no-sandbox',
+        '--disable-setuid-sandbox',
+        '--disable-dev-shm-usage',
+        '--disable-accelerated-2d-canvas',
+        '--no-first-run',
+        '--no-zygote',
+        '--disable-gpu',
+      ],
+    });
+
+    this.browser = await this.browserPromise;
+    
+    // Handle browser disconnection
+    this.browser.on('disconnected', () => {
+      this.browser = null;
+      this.browserPromise = null;
+    });
+
+    return this.browser;
+  }
+
+  /**
+   * Extract .tgs URL from Telegram NFT page using Puppeteer
+   */
+  private async extractTgsUrlWithPuppeteer(giftUrl: string): Promise<string | null> {
+    let page: Page | null = null;
+    
+    try {
+      const browser = await this.getBrowser();
+      page = await browser.newPage();
+
+      // Set User-Agent
+      await page.setUserAgent(
+        'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) ' +
+        'AppleWebKit/537.36 (KHTML, like Gecko) ' +
+        'Chrome/120.0.0.0 Safari/537.36'
+      );
+
+      console.log(`🌐 Opening page: ${giftUrl}`);
+      
+      // Navigate to the page and wait for content to load
+      await page.goto(giftUrl, {
+        waitUntil: 'networkidle2',
+        timeout: 90000,
+      });
+
+      // Wait for the source element with .tgs file
+      const selector = 'source[type="application/x-tgsticker"]';
+      console.log(`⏳ Waiting for selector: ${selector}`);
+      
+      await page.waitForSelector(selector, {
+        timeout: 60000,
+      });
+
+      // Extract srcset attribute from the source element
+      const tgsUrl = await page.$eval(
+        selector,
+        (el) => el.getAttribute('srcset')
+      );
+
+      if (!tgsUrl) {
+        console.error('❌ Failed to get .tgs URL from DOM');
+        return null;
+      }
+
+      // Parse srcset - take first URL (srcset can have multiple values)
+      const finalTgsUrl = tgsUrl.split(',')[0].trim().split(' ')[0].trim();
+      console.log(`✅ Found .tgs URL: ${finalTgsUrl}`);
+
+      return finalTgsUrl;
+    } catch (error) {
+      console.error('Error extracting .tgs URL with Puppeteer:', error);
+      throw error;
+    } finally {
+      if (page) {
+        await page.close();
+      }
+    }
   }
 
   /**
@@ -51,32 +145,42 @@ class GiftProcessingService {
         throw new Error('Invalid gift URL format. Expected: https://t.me/nft/...');
       }
 
-      // 1. Download HTML page
-      const pageResponse = await axios.get(giftUrl, {
-        responseType: 'text',
-        headers: {
-          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-        },
-      });
+      console.log(`🔗 Processing gift URL: ${giftUrl}`);
 
-      const html = pageResponse.data;
-
-      // 2. Extract .tgs URL
-      const tgsUrl = this.extractTgsUrl(html);
+      // 1. Extract .tgs URL using Puppeteer (required because page loads dynamically)
+      console.log('🌐 Extracting .tgs URL using Puppeteer...');
+      const tgsUrl = await this.extractTgsUrlWithPuppeteer(giftUrl);
+      
       if (!tgsUrl) {
-        throw new Error('TGS URL not found on page');
+        throw new Error('TGS URL not found on page. The page might not have loaded correctly.');
       }
 
-      // 3. Download and decompress .tgs to Lottie JSON
+      // 2. Download and decompress .tgs to Lottie JSON
+      console.log('💾 Downloading and decompressing .tgs file...');
       const animationData = await this.downloadAndDecompressTgs(tgsUrl);
+      console.log('✅ Animation data extracted successfully');
 
       return {
         animationData,
         tgsUrl,
       };
     } catch (error) {
-      console.error('Error processing gift URL:', error);
+      console.error('❌ Error processing gift URL:', error);
+      if (error instanceof Error) {
+        throw new Error(`Failed to process gift URL: ${error.message}`);
+      }
       throw error;
+    }
+  }
+
+  /**
+   * Cleanup browser instance (call on app shutdown)
+   */
+  async cleanup(): Promise<void> {
+    if (this.browser) {
+      await this.browser.close();
+      this.browser = null;
+      this.browserPromise = null;
     }
   }
 }

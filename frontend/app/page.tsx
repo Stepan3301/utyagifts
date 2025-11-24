@@ -160,6 +160,24 @@ export default function Home() {
     return () => clearTimeout(timeout)
   }, [mounted])
 
+  // Process all unprocessed gifts when app loads
+  useEffect(() => {
+    if (mounted && telegramUser) {
+      const processAllGifts = async () => {
+        try {
+          console.log('🔄 Processing all unprocessed gifts...')
+          await giftProcessingApi.processAllUnprocessed()
+          console.log('✅ Finished processing gifts')
+        } catch (error: any) {
+          console.warn('Failed to process unprocessed gifts:', error.message)
+          // Don't block app if processing fails
+        }
+      }
+      // Process gifts after a short delay to ensure user is authenticated
+      setTimeout(processAllGifts, 1000)
+    }
+  }, [mounted, telegramUser])
+
   // Fetch inventory when gifts tab is active
   useEffect(() => {
     if (activeTab === 'gifts' && mounted && telegramUser) {
@@ -169,6 +187,25 @@ export default function Home() {
           const response: InventoryResponse = await inventoryApi.getInventory()
           const gifts = response.inventory || []
           setInventory(gifts)
+          
+          // Check if any gifts need processing
+          const needsProcessing = gifts.some(g => g.gift_url && !g.animation_data)
+          if (needsProcessing) {
+            // Trigger processing in background
+            giftProcessingApi.processAllUnprocessed().catch(err => {
+              console.warn('Background processing failed:', err)
+            })
+            
+            // Refetch after processing completes (give it time)
+            setTimeout(async () => {
+              try {
+                const updatedResponse: InventoryResponse = await inventoryApi.getInventory()
+                setInventory(updatedResponse.inventory || [])
+              } catch (error) {
+                console.error('Failed to refetch inventory:', error)
+              }
+            }, 5000) // Wait 5 seconds for processing to complete
+          }
         } catch (error: any) {
           console.error('Failed to fetch inventory:', error)
           // Don't show error if it's an auth issue - user might not be authenticated yet
@@ -557,38 +594,58 @@ export default function Home() {
                     </div>
                   ) : (
                     <div className="grid grid-cols-2 gap-4">
-                      {inventory.map((gift) => (
-                        <div
-                          key={gift.id}
-                          className="relative rounded-2xl border border-white/10 bg-white/5 aspect-square overflow-hidden backdrop-blur-lg hover:bg-white/10 transition-all"
-                        >
-                          {gift.animation_data ? (
-                            <div className="w-full h-full flex items-center justify-center p-2">
-                              <Lottie
-                                animationData={gift.animation_data}
-                                loop={true}
-                                autoplay={true}
-                                style={{ width: '100%', height: '100%' }}
+                      {inventory.map((gift) => {
+                        const isProcessing = gift.gift_url && !gift.animation_data
+                        // Handle animation_data - it might be a string (JSON) or object
+                        let animationData = null
+                        if (gift.animation_data) {
+                          try {
+                            animationData = typeof gift.animation_data === 'string' 
+                              ? JSON.parse(gift.animation_data) 
+                              : gift.animation_data
+                          } catch (e) {
+                            console.warn('Failed to parse animation_data for gift:', gift.id, e)
+                          }
+                        }
+                        
+                        return (
+                          <div
+                            key={gift.id}
+                            className="relative rounded-2xl border border-white/10 bg-white/5 aspect-square overflow-hidden backdrop-blur-lg hover:bg-white/10 transition-all"
+                          >
+                            {isProcessing ? (
+                              <div className="w-full h-full flex flex-col items-center justify-center p-4">
+                                <div className="animate-spin text-4xl mb-2">🎁</div>
+                                <p className="text-white/60 text-xs text-center">Processing animation...</p>
+                              </div>
+                            ) : animationData ? (
+                              <div className="w-full h-full flex items-center justify-center p-2">
+                                <Lottie
+                                  animationData={animationData}
+                                  loop={true}
+                                  autoplay={true}
+                                  style={{ width: '100%', height: '100%' }}
+                                />
+                              </div>
+                            ) : gift.image_url ? (
+                              <img
+                                src={gift.image_url}
+                                alt={gift.name || 'Gift'}
+                                className="w-full h-full object-contain p-2"
                               />
-                            </div>
-                          ) : gift.image_url ? (
-                            <img
-                              src={gift.image_url}
-                              alt={gift.name || 'Gift'}
-                              className="w-full h-full object-contain p-2"
-                            />
-                          ) : (
-                            <div className="w-full h-full flex items-center justify-center">
-                              <span className="text-4xl">🎁</span>
-                            </div>
-                          )}
-                          {gift.name && (
-                            <div className="absolute bottom-0 left-0 right-0 bg-black/60 backdrop-blur-sm px-2 py-1">
-                              <p className="text-white text-xs font-medium truncate">{gift.name}</p>
-                            </div>
-                          )}
-                        </div>
-                      ))}
+                            ) : (
+                              <div className="w-full h-full flex items-center justify-center">
+                                <span className="text-4xl">🎁</span>
+                              </div>
+                            )}
+                            {gift.name && (
+                              <div className="absolute bottom-0 left-0 right-0 bg-black/60 backdrop-blur-sm px-2 py-1">
+                                <p className="text-white text-xs font-medium truncate">{gift.name}</p>
+                              </div>
+                            )}
+                          </div>
+                        )
+                      })}
                     </div>
                   )}
                 </div>
