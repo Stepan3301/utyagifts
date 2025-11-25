@@ -142,7 +142,7 @@ class GameService {
 
     if (session.status !== 'running') {
       if (session.status === 'crashed') {
-        throw new Error('Session already crashed');
+      throw new Error('Session already crashed');
       }
       throw new Error('Session is not running');
     }

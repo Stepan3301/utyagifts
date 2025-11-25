@@ -50,7 +50,7 @@ class GameSessionRepository {
     }
 
     return data ?? null
-  }
+      }
 
   async findLatestByUserId(userId: string): Promise<DBGameSession | null> {
     const { data, error } = await supabase

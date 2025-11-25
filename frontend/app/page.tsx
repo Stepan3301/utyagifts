@@ -111,10 +111,15 @@ interface BotPlayer {
 }
 
 const parseAnimationData = (raw: unknown, giftId: string): any | null => {
-  if (!raw) return null
+  if (raw === null || raw === undefined) return null
+
+  const value = typeof raw === 'string' ? raw.trim() : raw
+  if (value === '' || value === 'null' || value === 'undefined') {
+    return null
+  }
 
   try {
-    const parsed = typeof raw === 'string' ? JSON.parse(raw) : raw
+    const parsed = typeof value === 'string' ? JSON.parse(value) : value
     if (parsed && typeof parsed === 'object' && 'v' in parsed) {
       return parsed
     }
@@ -238,19 +243,19 @@ export default function Home() {
     setTargetCrashMultiplier(activeSession.crashPoint)
 
     if (activeSession.status === 'countdown') {
-      if (sessionState !== 'countdown') {
-        setSessionState('countdown')
-        setCollectedMultiplier(null)
+            if (sessionState !== 'countdown') {
+              setSessionState('countdown')
+              setCollectedMultiplier(null)
         setCurrentMultiplier(1)
         setBotPlayers([])
       }
     } else if (activeSession.status === 'running') {
-      if (sessionState !== 'running') {
-        setSessionState('running')
-        setCollectedMultiplier(null)
+            if (sessionState !== 'running') {
+              setSessionState('running')
+              setCollectedMultiplier(null)
         setCurrentMultiplier(1)
         setBotPlayers(generateBotPlayers(activeSession.crashPoint))
-      }
+            }
     } else if (activeSession.status === 'cashed_out') {
       setSessionState('cashed')
     } else if (activeSession.status === 'crashed') {
@@ -299,9 +304,9 @@ export default function Home() {
     if (sessionState === 'countdown' && activeSession?.countdownEndsAt) {
       const updateCountdown = () => {
         const remaining = Math.max(0, activeSession.countdownEndsAt! - Date.now())
-        setCountdown(Math.ceil(remaining / 1000))
+          setCountdown(Math.ceil(remaining / 1000))
       }
-
+      
       updateCountdown()
       const interval = setInterval(updateCountdown, 150)
 
@@ -464,23 +469,23 @@ export default function Home() {
     }))
 
     const youEntry = {
-      name: 'You',
-      amount:
+        name: 'You',
+        amount:
         collectedMultiplier !== null
-          ? `${collectedMultiplier.toFixed(2)}x`
+            ? `${collectedMultiplier.toFixed(2)}x`
           : sessionState === 'running'
-            ? `${currentMultiplier.toFixed(2)}x`
-            : '—',
-      icon: '🧑',
-      status:
+              ? `${currentMultiplier.toFixed(2)}x`
+              : '—',
+        icon: '🧑',
+        status:
         sessionState === 'running' && collectedMultiplier === null
-          ? 'Live'
+              ? 'Live'
           : sessionState === 'running'
-            ? 'Collected'
+                ? 'Collected'
             : sessionState === 'cashed'
               ? `Collected ${collectedMultiplier?.toFixed(2) ?? ''}x`
-              : sessionState === 'crashed'
-                ? 'Crashed'
+                : sessionState === 'crashed'
+                  ? 'Crashed'
                 : sessionState === 'countdown'
                   ? `Starting in ${countdown}s`
                   : 'Ready',
@@ -1024,15 +1029,15 @@ export default function Home() {
                       >
                         <div className="h-12 w-12 flex items-center justify-center">
                             {animationData ? (
-                              <Lottie
+                            <Lottie
                                 animationData={animationData}
-                                loop={true}
-                                autoplay={true}
-                                style={{ width: '48px', height: '48px' }}
-                              />
-                            ) : (
-                              <span className="text-2xl">🎁</span>
-                            )}
+                              loop={true}
+                              autoplay={true}
+                              style={{ width: '48px', height: '48px' }}
+                            />
+                          ) : (
+                            <span className="text-2xl">🎁</span>
+                          )}
                         </div>
                         {gift.name && (
                           <p className="mt-1 text-xs text-white/80 truncate max-w-[60px]">
