@@ -360,6 +360,8 @@ export default function Home() {
   const [activeSession, setActiveSession] = useState<GameSessionPayload | null>(null)
   const [countdown, setCountdown] = useState(0)
   const [selectedGiftId, setSelectedGiftId] = useState<string | null>(null)
+  const [isQueuedForNextSession, setIsQueuedForNextSession] = useState(false)
+  const [preSessionCountdown, setPreSessionCountdown] = useState<number | null>(null)
   const [botPlayers, setBotPlayers] = useState<BotPlayer[]>([])
   const animationRef = useRef<LottieRefCurrentProps>(null)
   const crashTargetRef = useRef<number>(10)
@@ -534,9 +536,11 @@ export default function Home() {
     }
   }, [mounted, telegramUser])
 
-  // Fetch inventory when gifts tab is active
+  // Fetch inventory when gifts or game tab is active
   useEffect(() => {
-    if (activeTab === 'gifts' && mounted && telegramUser) {
+    const shouldLoadInventory = mounted && telegramUser && (activeTab === 'gifts' || activeTab === 'game')
+
+    if (shouldLoadInventory) {
       const fetchInventory = async () => {
         try {
           setLoadingInventory(true)
@@ -573,9 +577,6 @@ export default function Home() {
         }
       }
       fetchInventory()
-    } else if (activeTab !== 'gifts') {
-      // Clear inventory when switching away from gifts tab
-      setInventory([])
     }
   }, [activeTab, mounted, telegramUser])
 
@@ -586,6 +587,14 @@ export default function Home() {
       setSelectedGiftId(null)
     }
   }, [inventory, selectedGiftId])
+
+
+  useEffect(() => {
+    if (!['idle', 'crashed', 'cashed'].includes(sessionState)) {
+      setIsQueuedForNextSession(false)
+      setPreSessionCountdown(null)
+    }
+  }, [sessionState])
 
   const gradientOverlay = useMemo(
     () =>
@@ -620,7 +629,13 @@ export default function Home() {
     return `${Math.min(value, MAX_MULTIPLIER).toFixed(2)}x`
   }, [currentMultiplier, sessionState, targetCrashMultiplier])
 
+  const canStartSession = ['idle', 'crashed', 'cashed'].includes(sessionState)
+
   const sessionMessage = useMemo(() => {
+    if (canStartSession && isQueuedForNextSession && preSessionCountdown !== null) {
+      return `Session queued. Launching in ${preSessionCountdown}s...`
+    }
+
     switch (sessionState) {
       case 'countdown':
         return `Session starting in ${countdown}s...`
@@ -636,7 +651,16 @@ export default function Home() {
       default:
         return 'Waiting for next session...'
     }
-  }, [collectedMultiplier, currentMultiplier, sessionState, targetCrashMultiplier, countdown])
+  }, [
+    canStartSession,
+    collectedMultiplier,
+    countdown,
+    currentMultiplier,
+    isQueuedForNextSession,
+    preSessionCountdown,
+    sessionState,
+    targetCrashMultiplier,
+  ])
 
   const players = useMemo(() => {
     const botEntries = botPlayers.map((bot) => ({
@@ -654,30 +678,61 @@ export default function Home() {
     }))
 
     const youEntry = {
-        name: 'You',
-        amount:
+      name: 'You',
+      amount:
         collectedMultiplier !== null
-            ? `${collectedMultiplier.toFixed(2)}x`
+          ? `${collectedMultiplier.toFixed(2)}x`
           : sessionState === 'running'
-              ? `${currentMultiplier.toFixed(2)}x`
-              : '—',
-        icon: '🧑',
-        status:
-        sessionState === 'running' && collectedMultiplier === null
-              ? 'Live'
+            ? `${currentMultiplier.toFixed(2)}x`
+            : '—',
+      icon: '🧑',
+      status: isQueuedForNextSession && preSessionCountdown !== null
+        ? `Joining in ${preSessionCountdown}s`
+        : sessionState === 'running' && collectedMultiplier === null
+          ? 'Live'
           : sessionState === 'running'
-                ? 'Collected'
+            ? 'Collected'
             : sessionState === 'cashed'
               ? `Collected ${collectedMultiplier?.toFixed(2) ?? ''}x`
-                : sessionState === 'crashed'
-                  ? 'Crashed'
+              : sessionState === 'crashed'
+                ? 'Crashed'
                 : sessionState === 'countdown'
                   ? `Starting in ${countdown}s`
                   : 'Ready',
     }
 
     return [...botEntries, youEntry]
-  }, [botPlayers, sessionState, collectedMultiplier, currentMultiplier, countdown])
+  }, [
+    botPlayers,
+    countdown,
+    collectedMultiplier,
+    currentMultiplier,
+    isQueuedForNextSession,
+    preSessionCountdown,
+    sessionState,
+  ])
+
+  const queueNextSession = useCallback(() => {
+    if (!canStartSession || isQueuedForNextSession) {
+      return
+    }
+
+    if (!selectedGiftId) {
+      if (inventory.length > 0) {
+        setSelectedGiftId(inventory[0].id)
+      }
+      alert('Please select a gift from your inventory first')
+      return
+    }
+
+    setIsQueuedForNextSession(true)
+    setPreSessionCountdown(10)
+  }, [canStartSession, inventory, isQueuedForNextSession, selectedGiftId])
+
+  const cancelQueuedSession = useCallback(() => {
+    setIsQueuedForNextSession(false)
+    setPreSessionCountdown(null)
+  }, [])
 
   const handleStartSession = useCallback(async () => {
     if (!['idle', 'crashed', 'cashed'].includes(sessionState)) {
@@ -718,6 +773,26 @@ export default function Home() {
       alert(error.message || 'Failed to collect')
     }
   }, [activeSession, collectedMultiplier, currentMultiplier, sessionState])
+
+  // Manage pre-session countdown when user queues up
+  useEffect(() => {
+    if (!isQueuedForNextSession || preSessionCountdown === null) {
+      return
+    }
+
+    if (preSessionCountdown <= 0) {
+      setIsQueuedForNextSession(false)
+      setPreSessionCountdown(null)
+      handleStartSession()
+      return
+    }
+
+    const timer = setTimeout(() => {
+      setPreSessionCountdown((prev) => (prev !== null ? Math.max(prev - 1, 0) : null))
+    }, 1000)
+
+    return () => clearTimeout(timer)
+  }, [handleStartSession, isQueuedForNextSession, preSessionCountdown])
 
   useEffect(() => {
     if (sessionState === 'running') {
@@ -882,15 +957,12 @@ export default function Home() {
     return () => window.removeEventListener('resize', updateIndicatorPosition)
   }, [activeIndex, mounted])
 
-  const canStartSession = ['idle', 'crashed', 'cashed'].includes(sessionState)
-  const launchLabel =
-    sessionState === 'countdown'
-      ? `Countdown (${countdown}s)`
-      : sessionState === 'running'
-        ? 'Running...'
-        : canStartSession
-          ? 'Start Session'
-          : 'Preparing...'
+  const joinButtonLabel = isQueuedForNextSession ? 'Cancel Join' : 'Join Next Session'
+  const joinButtonDisabled =
+    !isQueuedForNextSession && (!canStartSession || inventory.length === 0)
+  const inventoryCountLabel = loadingInventory
+    ? 'Loading...'
+    : `${inventory.length} item${inventory.length === 1 ? '' : 's'}`
   const collectLabel =
     sessionState === 'running' && collectedMultiplier !== null
       ? `Collected at ${collectedMultiplier.toFixed(2)}x`
@@ -1247,10 +1319,10 @@ export default function Home() {
               <section className="mt-6 flex gap-3">
                 <button
                   className="btn flex-1 min-w-[120px] py-3 text-base font-bold disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:transform-none"
-                  onClick={handleStartSession}
-                  disabled={!canStartSession}
+                  onClick={isQueuedForNextSession ? cancelQueuedSession : queueNextSession}
+                  disabled={joinButtonDisabled}
                 >
-                  {launchLabel}
+                  {joinButtonLabel}
                 </button>
                 <button
                   className="btn flex-1 min-w-[120px] py-3 text-base font-bold disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:transform-none"
@@ -1260,6 +1332,11 @@ export default function Home() {
                   {collectLabel}
                 </button>
               </section>
+              {isQueuedForNextSession && preSessionCountdown !== null && (
+                <p className="mt-2 text-center text-sm text-white/70">
+                  Next session begins in {preSessionCountdown}s
+                </p>
+              )}
 
               {/* Player list - only show on game tab */}
               {activeTab === 'game' && (
@@ -1299,26 +1376,65 @@ export default function Home() {
                     <span>🎒</span>
                     Inventory
                   </h3>
-                  <span className="text-xs text-white/50">0 items</span>
+                  <span className="text-xs text-white/50">{inventoryCountLabel}</span>
                 </div>
                 
-                {/* Placeholder for inventory items */}
-                <div className="flex gap-3 overflow-x-auto pb-2 scrollbar-hide">
-                  <div className="flex-shrink-0 w-20 h-20 rounded-xl border border-white/10 bg-white/5 flex items-center justify-center backdrop-blur-lg opacity-50">
-                    <span className="text-2xl">🎁</span>
+                {loadingInventory ? (
+                  <div className="flex gap-3 overflow-x-auto pb-2 scrollbar-hide">
+                    {[...Array(4)].map((_, idx) => (
+                      <div
+                        // eslint-disable-next-line react/no-array-index-key
+                        key={idx}
+                        className="flex-shrink-0 w-20 h-20 rounded-xl border border-white/10 bg-white/10 animate-pulse"
+                      />
+                    ))}
                   </div>
-                  <div className="flex-shrink-0 w-20 h-20 rounded-xl border border-white/10 bg-white/5 flex items-center justify-center backdrop-blur-lg opacity-50">
-                    <span className="text-2xl">🎁</span>
+                ) : inventory.length === 0 ? (
+                  <div className="text-center py-4">
+                    <p className="text-sm text-white/60">No gifts yet</p>
+                    <p className="text-xs text-white/40">Play sessions to earn your first gift</p>
                   </div>
-                  <div className="flex-shrink-0 w-20 h-20 rounded-xl border border-white/10 bg-white/5 flex items-center justify-center backdrop-blur-lg opacity-50">
-                    <span className="text-2xl">🎁</span>
+                ) : (
+                  <div className="flex gap-3 overflow-x-auto pb-2 scrollbar-hide">
+                    {inventory.map((gift) => {
+                      const animationData = parseAnimationData(gift.animation_data, gift.id)
+                      const isSelected = selectedGiftId === gift.id
+                      return (
+                        <button
+                          key={gift.id}
+                          type="button"
+                          onClick={() => setSelectedGiftId(gift.id)}
+                          className={`flex-shrink-0 w-20 h-20 rounded-xl border p-2 transition-all ${
+                            isSelected ? 'border-blue-400 bg-blue-400/20' : 'border-white/10 bg-white/5 hover:border-white/20'
+                          }`}
+                        >
+                          <div className="w-full h-full flex items-center justify-center">
+                            {animationData ? (
+                              <LottieFirstFrame
+                                animationData={animationData}
+                                giftId={gift.id}
+                                className="w-full h-full object-contain"
+                                alt={gift.name || 'Gift'}
+                              />
+                            ) : gift.image_url ? (
+                              <img
+                                src={gift.image_url}
+                                alt={gift.name || 'Gift'}
+                                className="w-full h-full object-contain"
+                              />
+                            ) : (
+                              <span className="text-2xl">🎁</span>
+                            )}
+                          </div>
+                        </button>
+                      )
+                    })}
                   </div>
-                  <div className="flex-shrink-0 w-20 h-20 rounded-xl border border-white/10 bg-white/5 flex items-center justify-center backdrop-blur-lg opacity-50">
-                    <span className="text-2xl">🎁</span>
-                  </div>
-                </div>
+                )}
                 
-                <p className="text-xs text-white/40 mt-3 text-center">Your collected gifts will appear here</p>
+                <p className="text-xs text-white/40 mt-3 text-center">
+                  Tap a gift to prepare it for the next launch
+                </p>
               </div>
         </div>
           </section>
