@@ -1,7 +1,3 @@
-import { gameService } from './gameService';
-import { gameSessionRepository } from '../repositories/gameSessionRepository';
-import type { GameSession as DBGameSession } from '../lib/supabase';
-
 export interface GlobalSession {
   id: string;
   status: 'countdown' | 'running' | 'finished';
