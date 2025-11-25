@@ -31,7 +31,8 @@ jobs:
         working-directory: ./frontend
         run: |
           # Install dependencies (will create package-lock.json if missing)
-          npm install --legacy-peer-deps --no-audit --no-fund
+          # Using --no-workspaces to avoid workspace detection issues
+          npm install --no-workspaces --legacy-peer-deps --no-audit --no-fund
 
       - name: Validate GitHub Secrets
         run: |
