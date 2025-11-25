@@ -269,6 +269,9 @@ export const gameApi = {
   cashOut: (sessionId: string) =>
     apiClient.post(`/game/session/${sessionId}/cashout`),
   getActiveSession: () => apiClient.get('/game/session/active'),
+  getCurrentSession: () => apiClient.get('/game/session/current'),
+  joinSession: (giftId: string) =>
+    apiClient.post('/game/session/join', { giftId }),
   getSessionHistory: (limit = 20, offset = 0) =>
     apiClient.get(`/game/session/history?limit=${limit}&offset=${offset}`),
 }

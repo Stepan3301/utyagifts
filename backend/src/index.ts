@@ -12,6 +12,7 @@ import { healthRouter } from './routes/health';
 import { giftProcessingRouter } from './routes/giftProcessing';
 import { telegramService } from './services/telegramService';
 import { giftProcessingService } from './services/giftProcessingService';
+import { sessionManagerService } from './services/sessionManagerService';
 
 dotenv.config();
 
@@ -70,6 +71,9 @@ telegramService.initialize().catch((error) => {
 app.listen(PORT, () => {
   console.log(`🚀 Server running on port ${PORT}`);
   console.log(`📱 Environment: ${process.env.NODE_ENV || 'development'}`);
+  
+  // Start continuous session manager
+  sessionManagerService.start();
 });
 
 // Cleanup on shutdown
@@ -81,6 +85,7 @@ process.on('SIGTERM', async () => {
 
 process.on('SIGINT', async () => {
   console.log('SIGINT received, cleaning up...');
+  sessionManagerService.stop();
   await giftProcessingService.cleanup();
   process.exit(0);
 });

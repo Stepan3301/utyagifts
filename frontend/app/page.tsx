@@ -5,7 +5,7 @@ import WebApp from '@twa-dev/sdk'
 import Lottie, { type LottieRefCurrentProps } from 'lottie-react'
 
 import rocketAnimation from '@/public/animations/rocket.json'
-import { authApi, inventoryApi, giftProcessingApi, type InventoryResponse } from '@/lib/api'
+import { authApi, inventoryApi, giftProcessingApi, gameApi, type InventoryResponse } from '@/lib/api'
 
 type Gift = InventoryResponse['inventory'][number]
 
@@ -81,7 +81,17 @@ const STARFIELD = [
 ]
 const MAX_MULTIPLIER = 20
 
-type SessionState = 'idle' | 'running' | 'cashed' | 'crashed'
+type SessionState = 'idle' | 'countdown' | 'running' | 'cashed' | 'crashed'
+
+interface GlobalSession {
+  id: string
+  status: 'countdown' | 'running' | 'finished'
+  crashPoint: number
+  countdownRemaining: number
+  countdownEndsAt?: number
+  hasJoined: boolean
+  startedAt?: number
+}
 
 interface TelegramUser {
   id: number
@@ -102,10 +112,14 @@ export default function Home() {
   const [collectedMultiplier, setCollectedMultiplier] = useState<number | null>(null)
   const [inventory, setInventory] = useState<Gift[]>([])
   const [loadingInventory, setLoadingInventory] = useState(false)
+  const [globalSession, setGlobalSession] = useState<GlobalSession | null>(null)
+  const [countdown, setCountdown] = useState(0)
+  const [selectedGiftId, setSelectedGiftId] = useState<string | null>(null)
   const animationRef = useRef<LottieRefCurrentProps>(null)
   const crashTargetRef = useRef<number>(10)
   const navRef = useRef<HTMLElement | null>(null)
   const navItemsRef = useRef<(HTMLButtonElement | null)[]>([])
+  const sessionPollIntervalRef = useRef<NodeJS.Timeout | null>(null)
 
   useEffect(() => {
     if (typeof window === 'undefined') return
@@ -152,6 +166,86 @@ export default function Home() {
 
     initializeApp()
   }, [])
+
+  // Poll for global session status
+  useEffect(() => {
+    if (!mounted || !telegramUser) return
+
+    const pollSession = async () => {
+      try {
+        const response = await gameApi.getCurrentSession()
+        const session = response.session as GlobalSession | null
+        
+        if (session) {
+          setGlobalSession(session)
+          
+          // Update local session state based on global session
+          if (session.status === 'countdown') {
+            setSessionState('countdown')
+            setCountdown(Math.ceil(session.countdownRemaining / 1000))
+          } else if (session.status === 'running') {
+            if (sessionState !== 'running') {
+              // Session just started
+              setSessionState('running')
+              crashTargetRef.current = session.crashPoint
+              setTargetCrashMultiplier(session.crashPoint)
+              setCurrentMultiplier(1)
+              setCollectedMultiplier(null)
+              
+              if (animationRef.current) {
+                animationRef.current.play()
+              }
+            }
+          } else if (session.status === 'finished') {
+            // Session finished - transition to crashed state briefly
+            if (sessionState === 'running') {
+              setSessionState('crashed')
+              setCurrentMultiplier(session.crashPoint)
+              if (animationRef.current) {
+                animationRef.current.stop()
+              }
+            }
+            // Note: Next countdown will start automatically via backend
+            // Frontend will pick it up on next poll
+          }
+        } else {
+          // No active session - could be between sessions
+          setGlobalSession(null)
+          // Don't reset state here - let it transition naturally
+        }
+      } catch (error) {
+        console.error('Failed to poll session:', error)
+      }
+    }
+
+    // Poll immediately and then every 500ms
+    pollSession()
+    const interval = setInterval(pollSession, 500)
+    sessionPollIntervalRef.current = interval
+
+    return () => {
+      if (sessionPollIntervalRef.current) {
+        clearInterval(sessionPollIntervalRef.current)
+      }
+    }
+  }, [mounted, telegramUser, sessionState])
+
+  // Update countdown display
+  useEffect(() => {
+    if (sessionState === 'countdown' && globalSession?.countdownEndsAt) {
+      const updateCountdown = () => {
+        const remaining = Math.max(0, globalSession.countdownEndsAt! - Date.now())
+        setCountdown(Math.ceil(remaining / 1000))
+      }
+      
+      updateCountdown() // Update immediately
+      const interval = setInterval(updateCountdown, 100)
+
+      return () => clearInterval(interval)
+    } else if (sessionState !== 'countdown') {
+      setCountdown(0)
+    }
+  }, [sessionState, globalSession])
 
   useEffect(() => {
     if (!mounted) return
@@ -259,7 +353,15 @@ export default function Home() {
 
   const sessionMessage = useMemo(() => {
     switch (sessionState) {
+      case 'countdown':
+        if (globalSession?.hasJoined) {
+          return `Joined! Session starting in ${countdown}s...`
+        }
+        return `Join session in ${countdown}s...`
       case 'running':
+        if (!globalSession?.hasJoined) {
+          return 'Session in progress (you did not join)'
+        }
         if (collectedMultiplier !== null) {
           return `You collected at ${collectedMultiplier.toFixed(2)}x - Watching rocket...`
         }
@@ -269,9 +371,9 @@ export default function Home() {
       case 'crashed':
         return `Rocket crashed at ${(targetCrashMultiplier ?? currentMultiplier).toFixed(2)}x`
       default:
-        return 'Ready for launch'
+        return 'Waiting for next session...'
     }
-  }, [collectedMultiplier, currentMultiplier, sessionState, targetCrashMultiplier])
+  }, [collectedMultiplier, currentMultiplier, sessionState, targetCrashMultiplier, globalSession, countdown])
 
   const players = useMemo(
     () => [
@@ -301,27 +403,47 @@ export default function Home() {
     [collectedMultiplier, currentMultiplier, sessionState]
   )
 
-  const handleLaunch = useCallback(() => {
-    if (sessionState === 'running') return
-
-    const crashPoint = parseFloat((Math.random() * (MAX_MULTIPLIER - 1.1) + 1.1).toFixed(2))
-    crashTargetRef.current = crashPoint
-
-    setTargetCrashMultiplier(crashPoint)
-    setCurrentMultiplier(1)
-    setCollectedMultiplier(null)
-    setSessionState('running')
-
-    if (animationRef.current) {
-      animationRef.current.play()
+  const handleJoinSession = useCallback(async () => {
+    if (sessionState !== 'countdown') {
+      return
     }
-  }, [sessionState])
+
+    if (globalSession?.hasJoined) {
+      return // Already joined
+    }
+
+    // If no gift selected, show inventory to select one
+    if (!selectedGiftId && inventory.length > 0) {
+      // Auto-select first gift if available
+      setSelectedGiftId(inventory[0].id)
+      return
+    }
+
+    if (!selectedGiftId) {
+      alert('Please select a gift from your inventory first')
+      return
+    }
+
+    try {
+      await gameApi.joinSession(selectedGiftId)
+      // Session state will update via polling
+    } catch (error: any) {
+      console.error('Failed to join session:', error)
+      alert(error.message || 'Failed to join session')
+    }
+  }, [sessionState, globalSession, selectedGiftId, inventory])
 
   const handleCollect = useCallback(() => {
     if (sessionState !== 'running' || collectedMultiplier !== null) return
+    
+    // Check if user joined the session
+    if (globalSession && !globalSession.hasJoined) {
+      alert('You did not join this session during the countdown period')
+      return
+    }
 
     setCollectedMultiplier(currentMultiplier)
-  }, [collectedMultiplier, currentMultiplier, sessionState])
+  }, [collectedMultiplier, currentMultiplier, sessionState, globalSession])
 
   useEffect(() => {
     if (sessionState === 'running') {
@@ -376,10 +498,13 @@ export default function Home() {
         next = parseFloat((2 * Math.pow(acceleratingRate, timeAfter2x)).toFixed(2))
       }
 
-      if (next >= crashTargetRef.current) {
+      // Use global session crash point if available, otherwise use local
+      const targetCrash = globalSession?.crashPoint || crashTargetRef.current
+      
+      if (next >= targetCrash) {
         isRunningRef.current = false
-        setCurrentMultiplier(parseFloat(crashTargetRef.current.toFixed(2)))
-        setSessionState('crashed')
+        setCurrentMultiplier(parseFloat(targetCrash.toFixed(2)))
+        // Don't set state to crashed here - let polling handle it
         return
       }
 
@@ -460,13 +585,17 @@ export default function Home() {
   }, [activeIndex, mounted])
 
   const launchLabel =
-    sessionState === 'running'
-      ? 'Running...'
-      : sessionState === 'crashed'
-        ? 'Restart'
-        : sessionState === 'cashed'
-          ? 'Replay'
-          : 'Launch'
+    sessionState === 'countdown'
+      ? globalSession?.hasJoined
+        ? `Joined (${countdown}s)`
+        : `Join Session (${countdown}s)`
+      : sessionState === 'running'
+        ? 'Running...'
+        : sessionState === 'crashed'
+          ? 'Next Session Soon'
+          : sessionState === 'cashed'
+            ? 'Next Session Soon'
+            : 'Waiting...'
   const collectLabel =
     sessionState === 'running' && collectedMultiplier !== null
       ? `Collected at ${collectedMultiplier.toFixed(2)}x`
@@ -475,7 +604,10 @@ export default function Home() {
         : sessionState === 'cashed'
           ? 'Collected'
           : 'Collect'
-  const collectDisabled = sessionState !== 'running' || collectedMultiplier !== null
+  const collectDisabled = 
+    sessionState !== 'running' || 
+    collectedMultiplier !== null ||
+    (globalSession && !globalSession.hasJoined)
 
   if (!mounted) {
     return (
@@ -778,12 +910,52 @@ export default function Home() {
               </div>
               <div className="mt-6 text-center text-sm font-medium text-white/80">{sessionMessage}</div>
 
+              {/* Gift Selection - shown during countdown */}
+              {sessionState === 'countdown' && !globalSession?.hasJoined && inventory.length > 0 && (
+                <section className="mt-4 w-full">
+                  <p className="mb-2 text-xs text-white/60 text-center">Select a gift to join:</p>
+                  <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide">
+                    {inventory.slice(0, 5).map((gift) => (
+                      <button
+                        key={gift.id}
+                        onClick={() => setSelectedGiftId(gift.id)}
+                        className={`flex-shrink-0 rounded-xl border-2 p-2 transition-all ${
+                          selectedGiftId === gift.id
+                            ? 'border-blue-400 bg-blue-400/20'
+                            : 'border-white/10 bg-white/5 hover:border-white/20'
+                        }`}
+                      >
+                        <div className="h-12 w-12 flex items-center justify-center">
+                          {gift.animation_data ? (
+                            <Lottie
+                              animationData={typeof gift.animation_data === 'string' 
+                                ? JSON.parse(gift.animation_data) 
+                                : gift.animation_data}
+                              loop={true}
+                              autoplay={true}
+                              style={{ width: '48px', height: '48px' }}
+                            />
+                          ) : (
+                            <span className="text-2xl">🎁</span>
+                          )}
+                        </div>
+                        {gift.name && (
+                          <p className="mt-1 text-xs text-white/80 truncate max-w-[60px]">
+                            {gift.name}
+                          </p>
+                        )}
+                      </button>
+                    ))}
+                  </div>
+                </section>
+              )}
+
               {/* Actions - moved below game frame */}
               <section className="mt-6 flex gap-3">
                 <button
                   className="btn flex-1 min-w-[120px] py-3 text-base font-bold disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:transform-none"
-                  onClick={handleLaunch}
-                  disabled={sessionState === 'running'}
+                  onClick={sessionState === 'countdown' ? handleJoinSession : undefined}
+                  disabled={sessionState === 'running' || sessionState === 'crashed' || sessionState === 'cashed' || (sessionState === 'countdown' && globalSession?.hasJoined)}
                 >
                   {launchLabel}
                 </button>
