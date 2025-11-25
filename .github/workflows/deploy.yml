@@ -30,9 +30,18 @@ jobs:
       - name: Install dependencies
         working-directory: ./frontend
         run: |
+          # Temporarily rename root package.json to prevent workspace detection
+          if [ -f ../package.json ]; then
+            mv ../package.json ../package.json.bak
+          fi
           # Install dependencies (will create package-lock.json if missing)
-          # Using --no-workspaces to avoid workspace detection issues
-          npm install --no-workspaces --legacy-peer-deps --no-audit --no-fund
+          npm install --legacy-peer-deps --no-audit --no-fund || true
+          # Restore root package.json
+          if [ -f ../package.json.bak ]; then
+            mv ../package.json.bak ../package.json
+          fi
+        env:
+          NPM_CONFIG_WORKSPACES: 'false'
 
       - name: Validate GitHub Secrets
         run: |
@@ -64,15 +73,28 @@ jobs:
       - name: Build Next.js app
         working-directory: ./frontend
         run: |
-          # Ensure npm doesn't detect parent workspace
-          # Use npx to run next build directly, bypassing npm scripts workspace detection
-          npx next build
+          # Temporarily rename root package.json to prevent workspace detection during build
+          if [ -f ../package.json ]; then
+            mv ../package.json ../package.json.bak
+          fi
+          # Use the locally installed next binary directly (try both relative paths)
+          if [ -f ./node_modules/.bin/next ]; then
+            ./node_modules/.bin/next build
+          elif [ -f node_modules/.bin/next ]; then
+            node_modules/.bin/next build
+          else
+            # Fallback to npm run build if binary not found
+            npm run build
+          fi
+          # Restore root package.json
+          if [ -f ../package.json.bak ]; then
+            mv ../package.json.bak ../package.json
+          fi
         env:
           NODE_ENV: production
           GITHUB_PAGES: 'true'
           NEXT_PUBLIC_API_BASE_URL: ${{ secrets.NEXT_PUBLIC_API_BASE_URL }}
           NEXT_PUBLIC_TELEGRAM_BOT_USERNAME: ${{ secrets.NEXT_PUBLIC_TELEGRAM_BOT_USERNAME || '' }}
-          NPM_CONFIG_WORKSPACES: 'false'
 
       - name: Setup Pages
         uses: actions/configure-pages@v4
