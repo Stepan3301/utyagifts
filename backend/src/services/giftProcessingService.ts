@@ -1,6 +1,6 @@
 import axios from 'axios';
 import * as pako from 'pako';
-import puppeteer, { Browser, Page } from 'puppeteer';
+import puppeteer, { Browser, Page } from 'puppeteer-core';
 
 export interface ProcessedGiftData {
   animationData: any; // Lottie JSON object
