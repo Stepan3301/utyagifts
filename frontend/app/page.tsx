@@ -132,6 +132,125 @@ const parseAnimationData = (raw: unknown, giftId: string): any | null => {
   }
 }
 
+// Cache for first frame images
+const firstFrameCache = new Map<string, string>()
+
+/**
+ * Extract the first frame from a Lottie animation and convert it to an image data URL
+ */
+const extractFirstFrame = async (animationData: any, giftId: string, size = 256): Promise<string | null> => {
+  // Check cache first
+  if (firstFrameCache.has(giftId)) {
+    return firstFrameCache.get(giftId) || null
+  }
+
+  try {
+    // Dynamically import lottie-web to avoid SSR issues
+    const lottieModule = await import('lottie-web')
+    const lottie = lottieModule.default || lottieModule
+    
+    // Create a canvas element
+    const canvas = document.createElement('canvas')
+    canvas.width = size
+    canvas.height = size
+    const ctx = canvas.getContext('2d')
+    
+    if (!ctx) {
+      console.warn('Failed to get canvas context for gift:', giftId)
+      return null
+    }
+
+    // Create a container for the animation (off-screen)
+    const container = document.createElement('div')
+    container.style.width = `${size}px`
+    container.style.height = `${size}px`
+    container.style.position = 'absolute'
+    container.style.left = '-9999px'
+    container.style.top = '-9999px'
+    document.body.appendChild(container)
+
+    // Render the first frame
+    const anim = lottie.loadAnimation({
+      container,
+      renderer: 'canvas',
+      loop: false,
+      autoplay: false,
+      animationData,
+    })
+
+    // Wait for animation to be ready and extract first frame
+    return new Promise<string | null>((resolve) => {
+      const onReady = () => {
+        try {
+          // Go to first frame (frame 0)
+          anim.goToAndStop(0, true)
+          
+          // Get the canvas from the animation
+          const animCanvas = container.querySelector('canvas') as HTMLCanvasElement
+          if (animCanvas) {
+            // Draw the animation canvas to our canvas
+            ctx.drawImage(animCanvas, 0, 0, size, size)
+            
+            // Convert to data URL
+            const dataUrl = canvas.toDataURL('image/png')
+            firstFrameCache.set(giftId, dataUrl)
+            
+            // Cleanup
+            anim.destroy()
+            document.body.removeChild(container)
+            
+            resolve(dataUrl)
+          } else {
+            anim.destroy()
+            document.body.removeChild(container)
+            resolve(null)
+          }
+        } catch (error) {
+          console.warn('Error extracting frame:', error)
+          anim.destroy()
+          document.body.removeChild(container)
+          resolve(null)
+        }
+      }
+
+      // Try both event names (different versions of lottie-web)
+      anim.addEventListener('DOMLoaded', onReady)
+      anim.addEventListener('data_ready', onReady)
+      
+      // Fallback timeout
+      setTimeout(() => {
+        if (container.parentNode) {
+          try {
+            anim.goToAndStop(0, true)
+            const animCanvas = container.querySelector('canvas') as HTMLCanvasElement
+            if (animCanvas) {
+              ctx.drawImage(animCanvas, 0, 0, size, size)
+              const dataUrl = canvas.toDataURL('image/png')
+              firstFrameCache.set(giftId, dataUrl)
+              anim.destroy()
+              document.body.removeChild(container)
+              resolve(dataUrl)
+            } else {
+              anim.destroy()
+              document.body.removeChild(container)
+              resolve(null)
+            }
+          } catch (error) {
+            anim.destroy()
+            if (container.parentNode) {
+              document.body.removeChild(container)
+            }
+            resolve(null)
+          }
+        }
+      }, 2000)
+    })
+  } catch (error) {
+    console.warn('Failed to extract first frame for gift:', giftId, error)
+    return null
+  }
+}
+
 const generateBotPlayers = (crashPoint: number): BotPlayer[] => {
   const botCount = Math.floor(Math.random() * (MAX_BOT_COUNT - MIN_BOT_COUNT + 1)) + MIN_BOT_COUNT
   const namesPool = [...BOT_NAMES].sort(() => Math.random() - 0.5)
@@ -159,6 +278,72 @@ interface TelegramUser {
   last_name?: string
   username?: string
   photo_url?: string
+}
+
+// Component to display first frame of Lottie animation as static image
+function LottieFirstFrame({ animationData, giftId, className = '', alt = 'Gift' }: { 
+  animationData: any
+  giftId: string
+  className?: string
+  alt?: string
+}) {
+  const [imageSrc, setImageSrc] = useState<string | null>(null)
+  const [isLoading, setIsLoading] = useState(true)
+
+  useEffect(() => {
+    // Only run on client side
+    if (typeof window === 'undefined') {
+      setIsLoading(false)
+      return
+    }
+
+    let mounted = true
+
+    const loadFirstFrame = async () => {
+      try {
+        const frameUrl = await extractFirstFrame(animationData, giftId, 512)
+        if (mounted) {
+          setImageSrc(frameUrl)
+          setIsLoading(false)
+        }
+      } catch (error) {
+        console.warn('Failed to load first frame:', error)
+        if (mounted) {
+          setIsLoading(false)
+        }
+      }
+    }
+
+    loadFirstFrame()
+
+    return () => {
+      mounted = false
+    }
+  }, [animationData, giftId])
+
+  if (isLoading) {
+    return (
+      <div className={`flex items-center justify-center ${className}`}>
+        <div className="animate-spin text-4xl">🎁</div>
+      </div>
+    )
+  }
+
+  if (imageSrc) {
+    return (
+      <img
+        src={imageSrc}
+        alt={alt}
+        className={className}
+      />
+    )
+  }
+
+  return (
+    <div className={`flex items-center justify-center ${className}`}>
+      <span className="text-4xl">🎁</span>
+    </div>
+  )
 }
 
 export default function Home() {
@@ -852,11 +1037,11 @@ export default function Home() {
                               </div>
                             ) : animationData ? (
                               <div className="w-full h-full flex items-center justify-center p-2">
-                                <Lottie
+                                <LottieFirstFrame
                                   animationData={animationData}
-                                  loop={true}
-                                  autoplay={true}
-                                  style={{ width: '100%', height: '100%' }}
+                                  giftId={gift.id}
+                                  className="w-full h-full object-contain"
+                                  alt={gift.name || 'Gift'}
                                 />
                               </div>
                             ) : gift.image_url ? (
@@ -1029,11 +1214,11 @@ export default function Home() {
                       >
                         <div className="h-12 w-12 flex items-center justify-center">
                             {animationData ? (
-                            <Lottie
+                            <LottieFirstFrame
                                 animationData={animationData}
-                              loop={true}
-                              autoplay={true}
-                              style={{ width: '48px', height: '48px' }}
+                                giftId={gift.id}
+                                className="w-12 h-12 object-contain"
+                                alt={gift.name || 'Gift'}
                             />
                           ) : (
                             <span className="text-2xl">🎁</span>
