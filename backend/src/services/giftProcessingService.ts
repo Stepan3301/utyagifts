@@ -23,12 +23,29 @@ class GiftProcessingService {
       return this.browserPromise;
     }
 
-    // Use system Chromium on Railway, bundled Chromium in development
-    const executablePath = process.env.PUPPETEER_EXECUTABLE_PATH || undefined;
+    // Determine Chromium executable path
+    // On Railway with nixpacks, Chromium should be in PATH
+    let executablePath: string | undefined = process.env.PUPPETEER_EXECUTABLE_PATH;
     
-    this.browserPromise = puppeteer.launch({
+    // Try to find Chromium using which command (most reliable on Linux)
+    if (!executablePath) {
+      try {
+        const { execSync } = require('child_process');
+        const chromiumPath = execSync('which chromium 2>/dev/null || which chromium-browser 2>/dev/null || echo ""', { 
+          encoding: 'utf-8',
+          timeout: 5000 
+        }).trim();
+        if (chromiumPath) {
+          executablePath = chromiumPath;
+          console.log(`✅ Found Chromium via which: ${chromiumPath}`);
+        }
+      } catch (e) {
+        console.warn('Could not find Chromium via which command, will try bundled');
+      }
+    }
+    
+    const launchOptions: any = {
       headless: true,
-      executablePath,
       args: [
         '--no-sandbox',
         '--disable-setuid-sandbox',
@@ -37,8 +54,20 @@ class GiftProcessingService {
         '--no-first-run',
         '--no-zygote',
         '--disable-gpu',
+        '--disable-software-rasterizer',
+        '--disable-extensions',
       ],
-    });
+    };
+
+    // Only set executablePath if we found one, otherwise let Puppeteer use bundled
+    if (executablePath) {
+      launchOptions.executablePath = executablePath;
+      console.log(`🚀 Using system Chromium: ${executablePath}`);
+    } else {
+      console.log(`🚀 Using Puppeteer bundled Chromium`);
+    }
+    
+    this.browserPromise = puppeteer.launch(launchOptions);
 
     this.browser = await this.browserPromise;
     

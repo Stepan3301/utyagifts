@@ -12,7 +12,8 @@
     "db:generate": "prisma generate",
     "db:push": "prisma db push",
     "db:migrate": "prisma migrate dev",
-    "db:studio": "prisma studio"
+    "db:studio": "prisma studio",
+    "postinstall": "node -e \"try { require('puppeteer'); } catch(e) {}\""
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.39.3",

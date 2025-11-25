@@ -5,7 +5,7 @@ import WebApp from '@twa-dev/sdk'
 import Lottie, { type LottieRefCurrentProps } from 'lottie-react'
 
 import rocketAnimation from '@/public/animations/rocket.json'
-import { authApi, inventoryApi, giftProcessingApi, gameApi, type InventoryResponse } from '@/lib/api'
+import { authApi, inventoryApi, giftProcessingApi, gameApi, type InventoryResponse, type CurrentSessionResponse } from '@/lib/api'
 
 type Gift = InventoryResponse['inventory'][number]
 
@@ -173,7 +173,7 @@ export default function Home() {
 
     const pollSession = async () => {
       try {
-        const response = await gameApi.getCurrentSession()
+        const response: CurrentSessionResponse = await gameApi.getCurrentSession()
         const session = response.session as GlobalSession | null
         
         if (session) {
@@ -525,7 +525,7 @@ export default function Home() {
       isRunningRef.current = false
       cancelAnimationFrame(rafId)
     }
-  }, [sessionState])
+  }, [sessionState, globalSession?.crashPoint])
 
   useEffect(() => {
     if (!animationRef.current) return
@@ -604,10 +604,10 @@ export default function Home() {
         : sessionState === 'cashed'
           ? 'Collected'
           : 'Collect'
-  const collectDisabled = 
+  const collectDisabled: boolean = 
     sessionState !== 'running' || 
     collectedMultiplier !== null ||
-    (globalSession && !globalSession.hasJoined)
+    (globalSession ? !globalSession.hasJoined : false)
 
   if (!mounted) {
     return (

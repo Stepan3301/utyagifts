@@ -2,7 +2,10 @@
 nixPkgs = ["nodejs_20", "chromium"]
 
 [phases.install]
-cmds = ["npm install"]
+cmds = [
+  "export PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true",
+  "npm install"
+]
 
 [phases.build]
 cmds = ["npm run build"]
