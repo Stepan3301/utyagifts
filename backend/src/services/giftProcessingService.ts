@@ -1,6 +1,8 @@
 import axios from 'axios';
-import * as pako from 'pako';
+import pako from 'pako';
 import puppeteer, { Browser, Page } from 'puppeteer-core';
+import { existsSync } from 'fs';
+import { join } from 'path';
 
 export interface ProcessedGiftData {
   animationData: any; // Lottie JSON object
@@ -10,6 +12,66 @@ export interface ProcessedGiftData {
 class GiftProcessingService {
   private browser: Browser | null = null;
   private browserPromise: Promise<Browser> | null = null;
+
+  /**
+   * Try to resolve a Chromium/Chrome executable path.
+   * Supports Railway (nixpacks), macOS, Linux and Windows environments.
+   */
+  private resolveExecutablePath(): string | undefined {
+    if (process.env.PUPPETEER_EXECUTABLE_PATH) {
+      return process.env.PUPPETEER_EXECUTABLE_PATH;
+    }
+
+    const potentialPaths: string[] = [];
+
+    // Common Linux binaries (Railway)
+    potentialPaths.push('/usr/bin/chromium', '/usr/bin/chromium-browser', '/usr/bin/google-chrome', '/usr/bin/google-chrome-stable');
+
+    // macOS default Chrome installation
+    if (process.platform === 'darwin') {
+      potentialPaths.push('/Applications/Google Chrome.app/Contents/MacOS/Google Chrome');
+      potentialPaths.push('/Applications/Chromium.app/Contents/MacOS/Chromium');
+    }
+
+    // Windows default Chrome locations
+    if (process.platform === 'win32') {
+      const programFiles = process.env['ProgramFiles'] ?? 'C:\\Program Files';
+      const programFilesX86 = process.env['ProgramFiles(x86)'] ?? 'C:\\Program Files (x86)';
+      potentialPaths.push(
+        join(programFiles, 'Google/Chrome/Application/chrome.exe'),
+        join(programFilesX86, 'Google/Chrome/Application/chrome.exe'),
+        join(programFiles, 'Chromium/Application/chrome.exe'),
+        join(programFilesX86, 'Chromium/Application/chrome.exe'),
+      );
+    }
+
+    // Try to use `which` command for any binary available on PATH
+    try {
+      const { execSync } = require('child_process');
+      const candidates = ['chromium', 'chromium-browser', 'google-chrome', 'google-chrome-stable', 'chrome', 'google-chrome-beta'];
+      for (const candidate of candidates) {
+        const result = execSync(`which ${candidate} 2>/dev/null || echo ""`, {
+          encoding: 'utf-8',
+          timeout: 3000,
+        }).trim();
+        if (result) {
+          console.log(`✅ Found Chromium via PATH (${candidate}): ${result}`);
+          return result;
+        }
+      }
+    } catch {
+      // Ignore - will fallback to potential paths
+    }
+
+    for (const path of potentialPaths) {
+      if (path && existsSync(path)) {
+        console.log(`✅ Using Chromium binary: ${path}`);
+        return path;
+      }
+    }
+
+    return undefined;
+  }
 
   /**
    * Get or create a browser instance (reused for efficiency)
@@ -23,29 +85,16 @@ class GiftProcessingService {
       return this.browserPromise;
     }
 
-    // Determine Chromium executable path
-    // On Railway with nixpacks, Chromium should be in PATH
-    let executablePath: string | undefined = process.env.PUPPETEER_EXECUTABLE_PATH;
-    
-    // Try to find Chromium using which command (most reliable on Linux)
+    const executablePath = this.resolveExecutablePath();
     if (!executablePath) {
-      try {
-        const { execSync } = require('child_process');
-        const chromiumPath = execSync('which chromium 2>/dev/null || which chromium-browser 2>/dev/null || echo ""', { 
-          encoding: 'utf-8',
-          timeout: 5000 
-        }).trim();
-        if (chromiumPath) {
-          executablePath = chromiumPath;
-          console.log(`✅ Found Chromium via which: ${chromiumPath}`);
-        }
-      } catch (e) {
-        console.warn('Could not find Chromium via which command, will try bundled');
-      }
+      throw new Error(
+        'Chromium executable not found. Set PUPPETEER_EXECUTABLE_PATH or ensure Chromium/Chrome is installed.'
+      );
     }
     
     const launchOptions: any = {
       headless: true,
+      executablePath,
       args: [
         '--no-sandbox',
         '--disable-setuid-sandbox',
@@ -58,14 +107,8 @@ class GiftProcessingService {
         '--disable-extensions',
       ],
     };
-
-    // Only set executablePath if we found one, otherwise let Puppeteer use bundled
-    if (executablePath) {
-      launchOptions.executablePath = executablePath;
-      console.log(`🚀 Using system Chromium: ${executablePath}`);
-    } else {
-      console.log(`🚀 Using Puppeteer bundled Chromium`);
-    }
+    
+    console.log(`🚀 Launching Chromium via puppeteer-core at: ${executablePath}`);
     
     this.browserPromise = puppeteer.launch(launchOptions);
 
@@ -153,8 +196,8 @@ class GiftProcessingService {
 
       const tgsBuffer = Buffer.from(response.data);
       
-      // Decompress gzip data
-      const jsonStr = pako.ungzip(tgsBuffer, { to: 'string' });
+      // Decompress gzip data (.tgs files are gzipped JSON)
+      const jsonStr = pako.inflate(tgsBuffer, { to: 'string' });
       const animationData = JSON.parse(jsonStr);
 
       return animationData;
