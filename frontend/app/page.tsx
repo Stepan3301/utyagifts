@@ -1024,13 +1024,14 @@ export default function Home() {
                       {inventory.map((gift) => {
                         const isProcessing = gift.gift_url && !gift.animation_data
                         const animationData = parseAnimationData(gift.animation_data, gift.id)
+                        const hasStaticPreview = Boolean(gift.image_url)
                         
                         return (
                           <div
                             key={gift.id}
                             className="relative rounded-2xl border border-white/10 bg-white/5 aspect-square overflow-hidden backdrop-blur-lg hover:bg-white/10 transition-all"
                           >
-                            {isProcessing ? (
+                            {isProcessing && !animationData && !hasStaticPreview ? (
                               <div className="w-full h-full flex flex-col items-center justify-center p-4">
                                 <div className="animate-spin text-4xl mb-2">🎁</div>
                                 <p className="text-white/60 text-xs text-center">Processing animation...</p>
@@ -1219,6 +1220,12 @@ export default function Home() {
                                 giftId={gift.id}
                                 className="w-12 h-12 object-contain"
                                 alt={gift.name || 'Gift'}
+                            />
+                          ) : gift.image_url ? (
+                            <img
+                              src={gift.image_url}
+                              alt={gift.name || 'Gift'}
+                              className="w-12 h-12 object-contain rounded-lg"
                             />
                           ) : (
                             <span className="text-2xl">🎁</span>
