@@ -63,12 +63,16 @@ jobs:
 
       - name: Build Next.js app
         working-directory: ./frontend
-        run: npm run build
+        run: |
+          # Ensure npm doesn't detect parent workspace
+          # Use npx to run next build directly, bypassing npm scripts workspace detection
+          npx next build
         env:
           NODE_ENV: production
           GITHUB_PAGES: 'true'
           NEXT_PUBLIC_API_BASE_URL: ${{ secrets.NEXT_PUBLIC_API_BASE_URL }}
           NEXT_PUBLIC_TELEGRAM_BOT_USERNAME: ${{ secrets.NEXT_PUBLIC_TELEGRAM_BOT_USERNAME || '' }}
+          NPM_CONFIG_WORKSPACES: 'false'
 
       - name: Setup Pages
         uses: actions/configure-pages@v4
