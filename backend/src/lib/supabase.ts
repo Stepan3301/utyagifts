@@ -104,6 +104,8 @@ export interface Database {
           status: string
           crashed_at: string | null
           cashed_out_at: string | null
+          countdown_ends_at: string | null
+          started_at: string | null
           created_at: string
           updated_at: string
         }
@@ -115,6 +117,8 @@ export interface Database {
           status?: string
           crashed_at?: string | null
           cashed_out_at?: string | null
+          countdown_ends_at?: string | null
+          started_at?: string | null
           created_at?: string
           updated_at?: string
         }
@@ -126,6 +130,8 @@ export interface Database {
           status?: string
           crashed_at?: string | null
           cashed_out_at?: string | null
+          countdown_ends_at?: string | null
+          started_at?: string | null
           created_at?: string
           updated_at?: string
         }

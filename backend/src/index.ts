@@ -12,7 +12,6 @@ import { healthRouter } from './routes/health';
 import { giftProcessingRouter } from './routes/giftProcessing';
 import { telegramService } from './services/telegramService';
 import { giftProcessingService } from './services/giftProcessingService';
-import { sessionManagerService } from './services/sessionManagerService';
 
 dotenv.config();
 
@@ -76,12 +75,6 @@ app.listen(PORT, () => {
   console.log(`   - GET  /api/health`);
   console.log(`   - POST /api/gifts/process-all`);
   console.log(`   - GET  /api/game/session/current`);
-  console.log(`   - POST /api/game/session/join`);
-  
-  // Start continuous session manager
-  console.log(`🎮 Initializing session manager...`);
-  sessionManagerService.start();
-  console.log(`✅ Session manager started`);
 });
 
 // Cleanup on shutdown
@@ -93,7 +86,6 @@ process.on('SIGTERM', async () => {
 
 process.on('SIGINT', async () => {
   console.log('SIGINT received, cleaning up...');
-  sessionManagerService.stop();
   await giftProcessingService.cleanup();
   process.exit(0);
 });

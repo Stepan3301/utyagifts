@@ -3,77 +3,129 @@ import { giftService } from './giftService';
 import { poolService } from './poolService';
 import type { GameSession as DBGameSession } from '../lib/supabase';
 
-// Service-level interface (camelCase)
 export interface GameSession {
   id: string;
   userId: string;
   giftId: string;
-  multiplier: number;
+  crashPoint: number;
+  status: 'countdown' | 'running' | 'crashed' | 'cashed_out';
+  createdAt: Date;
+  countdownEndsAt?: number;
+  startedAt?: number;
   crashedAt?: number;
   cashedOutAt?: number;
-  status: 'active' | 'crashed' | 'cashed_out';
-  createdAt: Date;
 }
 
-// Helper to convert database row to service interface
 function mapGameSession(dbSession: DBGameSession): GameSession {
   return {
     id: dbSession.id,
     userId: dbSession.user_id,
     giftId: dbSession.gift_id || '',
-    multiplier: dbSession.multiplier ? Number(dbSession.multiplier) : 0,
+    crashPoint: dbSession.multiplier ? Number(dbSession.multiplier) : 0,
+    status: dbSession.status as GameSession['status'],
+    createdAt: new Date(dbSession.created_at),
+    countdownEndsAt: dbSession.countdown_ends_at
+      ? new Date(dbSession.countdown_ends_at).getTime()
+      : undefined,
+    startedAt: dbSession.started_at ? new Date(dbSession.started_at).getTime() : undefined,
     crashedAt: dbSession.crashed_at ? new Date(dbSession.crashed_at).getTime() : undefined,
     cashedOutAt: dbSession.cashed_out_at ? new Date(dbSession.cashed_out_at).getTime() : undefined,
-    status: dbSession.status as 'active' | 'crashed' | 'cashed_out',
-    createdAt: new Date(dbSession.created_at),
   };
 }
 
 class GameService {
-  /**
-   * Generate crash point (multiplier where rocket crashes)
-   */
+  private readonly COUNTDOWN_DURATION = 10_000;
+  private readonly MIN_CRASH_POINT = 1.01;
+  private readonly MAX_CRASH_POINT = 10.0;
+
   private generateCrashPoint(): number {
-    // Simple algorithm - can be made more sophisticated
-    // Returns a multiplier between 1.01 and 10.0
-    const min = 1.01;
-    const max = 10.0;
-    const crashPoint = min + Math.random() * (max - min);
-    
-    // Round to 2 decimal places
+    const crashPoint =
+      this.MIN_CRASH_POINT + Math.random() * (this.MAX_CRASH_POINT - this.MIN_CRASH_POINT);
     return Math.round(crashPoint * 100) / 100;
   }
 
-  /**
-   * Start a new game session
-   */
+  private estimateCrashDuration(crashPoint: number): number {
+    // Mirrors the multiplier curve logic used on the frontend (slow start, faster later)
+    const timeTo2x = 7500;
+    if (crashPoint <= 2) {
+      const slowRate = Math.pow(2, 1 / 7.5);
+      return Math.max((Math.log(crashPoint) / Math.log(slowRate)) * 1000, 2500);
+    }
+
+    const acceleratingBase = 1.35;
+    const acceleratingDuration = ((crashPoint - 2) / acceleratingBase) * 2000;
+    return Math.max(timeTo2x + acceleratingDuration, 5000);
+  }
+
+  private calculateCrashTimestamp(startedAt: number, crashPoint: number): number {
+    return startedAt + this.estimateCrashDuration(crashPoint);
+  }
+
+  private async refreshSessionState(
+    dbSession: DBGameSession | null,
+  ): Promise<DBGameSession | null> {
+    if (!dbSession) {
+      return null;
+    }
+
+    let session = dbSession;
+    const now = Date.now();
+
+    if (session.status === 'countdown' && session.countdown_ends_at) {
+      const countdownEnds = new Date(session.countdown_ends_at).getTime();
+      if (now >= countdownEnds) {
+        session = await gameSessionRepository.update(session.id, {
+          status: 'running',
+          startedAt: countdownEnds,
+        });
+      }
+    }
+
+    if (session.status === 'running' && session.started_at) {
+      const startedAt = new Date(session.started_at).getTime();
+      const crashTimestamp = this.calculateCrashTimestamp(
+        startedAt,
+        session.multiplier ? Number(session.multiplier) : this.MIN_CRASH_POINT,
+      );
+
+      if (now >= crashTimestamp) {
+        session = await gameSessionRepository.update(session.id, {
+          status: 'crashed',
+          crashedAt: crashTimestamp,
+        });
+
+        if (session.gift_id) {
+          await giftService.moveGiftToPool(session.gift_id);
+        }
+      }
+    }
+
+    return session;
+  }
+
   async startSession(userId: string, giftId: string): Promise<GameSession> {
-    // Verify gift ownership
     const gift = await giftService.getGiftById(giftId, userId);
     if (!gift) {
       throw new Error('Invalid gift or not owned');
     }
 
-    // Set gift status to in-game
     await giftService.setGiftInGame(giftId);
 
-    // Generate crash point
     const crashPoint = this.generateCrashPoint();
+    const now = Date.now();
+    const countdownEndsAt = now + this.COUNTDOWN_DURATION;
 
-    // Create session
     const dbSession = await gameSessionRepository.create({
       userId,
       giftId,
       multiplier: crashPoint,
-      status: 'active',
+      status: 'countdown',
+      countdownEndsAt,
     });
 
     return mapGameSession(dbSession);
   }
 
-  /**
-   * Cash out from current session
-   */
   async cashOut(userId: string, sessionId: string) {
     const dbSession = await gameSessionRepository.findById(sessionId);
 
@@ -81,28 +133,27 @@ class GameService {
       throw new Error('Session not found');
     }
 
-    const session = mapGameSession(dbSession);
-
-    if (session.status !== 'active') {
-      throw new Error('Session is not active');
+    const refreshed = await this.refreshSessionState(dbSession);
+    if (!refreshed) {
+      throw new Error('Session not found');
     }
 
-    // Check if already crashed
-    if (session.crashedAt && session.crashedAt < Date.now()) {
-      throw new Error('Session already crashed');
+    const session = mapGameSession(refreshed);
+
+    if (session.status !== 'running') {
+      if (session.status === 'crashed') {
+        throw new Error('Session already crashed');
+      }
+      throw new Error('Session is not running');
     }
 
-    // Calculate winnings
-    const winnings = Math.floor(session.multiplier); // Simplified
-
-    // Get gift from pool
+    const winnings = Math.floor(session.crashPoint);
     const awardedGiftId = await poolService.getRandomGift(winnings);
 
     if (awardedGiftId) {
       await giftService.awardGift(userId, awardedGiftId);
     }
 
-    // Update session
     await gameSessionRepository.update(sessionId, {
       status: 'cashed_out',
       cashedOutAt: Date.now(),
@@ -110,54 +161,26 @@ class GameService {
 
     return {
       success: true,
-      multiplier: session.multiplier,
+      multiplier: session.crashPoint,
       giftId: awardedGiftId,
     };
   }
 
-  /**
-   * Get active session for user
-   */
-  async getActiveSession(userId: string): Promise<GameSession | null> {
-    const dbSession = await gameSessionRepository.findActiveByUserId(userId);
-    return dbSession ? mapGameSession(dbSession) : null;
+  async getCurrentSession(userId: string): Promise<GameSession | null> {
+    const dbSession = await gameSessionRepository.findLatestByUserId(userId);
+    const refreshed = await this.refreshSessionState(dbSession);
+    return refreshed ? mapGameSession(refreshed) : null;
   }
 
-  /**
-   * Get session history
-   */
+  async getActiveSession(userId: string): Promise<GameSession | null> {
+    const dbSession = await gameSessionRepository.findActiveByUserId(userId);
+    const refreshed = await this.refreshSessionState(dbSession);
+    return refreshed ? mapGameSession(refreshed) : null;
+  }
+
   async getSessionHistory(userId: string, limit: number, offset: number): Promise<GameSession[]> {
     const dbSessions = await gameSessionRepository.findByUserId(userId, limit, offset);
     return dbSessions.map(mapGameSession);
-  }
-
-  /**
-   * Check if session should crash (called periodically)
-   */
-  async checkCrash(sessionId: string): Promise<boolean> {
-    const dbSession = await gameSessionRepository.findById(sessionId);
-    
-    if (!dbSession || dbSession.status !== 'active') {
-      return false;
-    }
-
-    const session = mapGameSession(dbSession);
-
-    // Simplified: check if current time has passed crash point
-    // In real implementation, this would check current multiplier vs crash point
-    const shouldCrash = false; // TODO: Implement proper crash logic
-
-    if (shouldCrash) {
-      await gameSessionRepository.update(sessionId, {
-        status: 'crashed',
-        crashedAt: Date.now(),
-      });
-
-      // Move gift to pool
-      await giftService.moveGiftToPool(session.giftId);
-    }
-
-    return shouldCrash;
   }
 }
 

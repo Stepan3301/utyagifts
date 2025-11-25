@@ -263,28 +263,34 @@ export const giftProcessingApi = {
 }
 
 // Game API types
+export interface GameSessionPayload {
+  id: string
+  status: 'countdown' | 'running' | 'crashed' | 'cashed_out'
+  crashPoint: number
+  countdownEndsAt?: number
+  startedAt?: number
+  crashedAt?: number
+  cashedOutAt?: number
+  createdAt: number
+  giftId: string
+}
+
+export interface StartSessionResponse {
+  session: GameSessionPayload
+}
+
 export interface CurrentSessionResponse {
-  session: {
-    id: string
-    status: 'countdown' | 'running' | 'finished'
-    crashPoint: number
-    countdownRemaining: number
-    countdownEndsAt?: number
-    hasJoined: boolean
-    startedAt?: number
-  } | null
+  session: GameSessionPayload | null
 }
 
 // Game API
 export const gameApi = {
   startSession: (giftId: string) =>
-    apiClient.post('/game/session/start', { giftId }),
+    apiClient.post<StartSessionResponse>('/game/session/start', { giftId }),
   cashOut: (sessionId: string) =>
     apiClient.post(`/game/session/${sessionId}/cashout`),
-  getActiveSession: () => apiClient.get('/game/session/active'),
+  getActiveSession: () => apiClient.get<{ session: GameSessionPayload | null }>('/game/session/active'),
   getCurrentSession: () => apiClient.get<CurrentSessionResponse>('/game/session/current'),
-  joinSession: (giftId: string) =>
-    apiClient.post('/game/session/join', { giftId }),
   getSessionHistory: (limit = 20, offset = 0) =>
     apiClient.get(`/game/session/history?limit=${limit}&offset=${offset}`),
 }

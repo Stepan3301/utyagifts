@@ -3,6 +3,7 @@ import pako from 'pako';
 import puppeteer, { Browser, Page } from 'puppeteer-core';
 import { existsSync } from 'fs';
 import { join } from 'path';
+import { execSync } from 'child_process';
 
 export interface ProcessedGiftData {
   animationData: any; // Lottie JSON object
@@ -47,7 +48,6 @@ class GiftProcessingService {
 
     // Try to use `which` command for any binary available on PATH
     try {
-      const { execSync } = require('child_process');
       const candidates = ['chromium', 'chromium-browser', 'google-chrome', 'google-chrome-stable', 'chrome', 'google-chrome-beta'];
       for (const candidate of candidates) {
         const result = execSync(`which ${candidate} 2>/dev/null || echo ""`, {

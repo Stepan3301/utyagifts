@@ -5,7 +5,7 @@ import WebApp from '@twa-dev/sdk'
 import Lottie, { type LottieRefCurrentProps } from 'lottie-react'
 
 import rocketAnimation from '@/public/animations/rocket.json'
-import { authApi, inventoryApi, giftProcessingApi, gameApi, type InventoryResponse, type CurrentSessionResponse } from '@/lib/api'
+import { authApi, inventoryApi, giftProcessingApi, gameApi, type InventoryResponse, type GameSessionPayload } from '@/lib/api'
 
 type Gift = InventoryResponse['inventory'][number]
 
@@ -80,17 +80,72 @@ const STARFIELD = [
   { top: '18%', left: '58%', size: 2, opacity: 0.68, blur: 11, duration: 5.3, delay: 2.6 },
 ]
 const MAX_MULTIPLIER = 20
+const BOT_NAMES = [
+  'Nova',
+  'Cosmo',
+  'Luna',
+  'Orion',
+  'Stella',
+  'Astra',
+  'Zen',
+  'Blaze',
+  'Ivy',
+  'Axel',
+  'Mira',
+  'Vega',
+  'Kira',
+  'Rex',
+  'Tara',
+]
+const MIN_BOT_COUNT = 5
+const MAX_BOT_COUNT = 10
 
 type SessionState = 'idle' | 'countdown' | 'running' | 'cashed' | 'crashed'
 
-interface GlobalSession {
+interface BotPlayer {
   id: string
-  status: 'countdown' | 'running' | 'finished'
-  crashPoint: number
-  countdownRemaining: number
-  countdownEndsAt?: number
-  hasJoined: boolean
-  startedAt?: number
+  name: string
+  cashOutPoint: number
+  status: 'countdown' | 'flying' | 'cashed' | 'crashed'
+  cashedAt?: number
+}
+
+const parseAnimationData = (raw: unknown, giftId: string): any | null => {
+  if (!raw) return null
+
+  try {
+    const parsed = typeof raw === 'string' ? JSON.parse(raw) : raw
+    if (parsed && typeof parsed === 'object' && 'v' in parsed) {
+      return parsed
+    }
+
+    console.warn('Invalid Lottie structure for gift:', giftId)
+    return null
+  } catch (error) {
+    console.warn('Failed to parse animation_data for gift:', giftId, error)
+    return null
+  }
+}
+
+const generateBotPlayers = (crashPoint: number): BotPlayer[] => {
+  const botCount = Math.floor(Math.random() * (MAX_BOT_COUNT - MIN_BOT_COUNT + 1)) + MIN_BOT_COUNT
+  const namesPool = [...BOT_NAMES].sort(() => Math.random() - 0.5)
+  const crashBuffer = Math.max(0.05, crashPoint * 0.1)
+  const maxSafePoint = Math.max(1.0, parseFloat((crashPoint - crashBuffer).toFixed(2)))
+  const minSafePoint = Math.max(1.0, parseFloat((maxSafePoint - 0.35).toFixed(2)))
+
+  return Array.from({ length: botCount }).map((_, index) => {
+    const span = Math.max(0.01, maxSafePoint - minSafePoint)
+    const rawPoint = minSafePoint + Math.random() * span
+    const cashOutPoint = parseFloat(Math.max(1.0, Math.min(rawPoint, maxSafePoint)).toFixed(2))
+
+    return {
+      id: `bot-${Date.now()}-${index}`,
+      name: namesPool[index % namesPool.length] ?? `Bot ${index + 1}`,
+      cashOutPoint,
+      status: 'countdown' as const,
+    }
+  })
 }
 
 interface TelegramUser {
@@ -112,9 +167,10 @@ export default function Home() {
   const [collectedMultiplier, setCollectedMultiplier] = useState<number | null>(null)
   const [inventory, setInventory] = useState<Gift[]>([])
   const [loadingInventory, setLoadingInventory] = useState(false)
-  const [globalSession, setGlobalSession] = useState<GlobalSession | null>(null)
+  const [activeSession, setActiveSession] = useState<GameSessionPayload | null>(null)
   const [countdown, setCountdown] = useState(0)
   const [selectedGiftId, setSelectedGiftId] = useState<string | null>(null)
+  const [botPlayers, setBotPlayers] = useState<BotPlayer[]>([])
   const animationRef = useRef<LottieRefCurrentProps>(null)
   const crashTargetRef = useRef<number>(10)
   const navRef = useRef<HTMLElement | null>(null)
@@ -167,102 +223,93 @@ export default function Home() {
     initializeApp()
   }, [])
 
-  // Poll for global session status
+  useEffect(() => {
+    if (!activeSession) {
+      setSessionState('idle')
+      setTargetCrashMultiplier(null)
+      setCountdown(0)
+      setCollectedMultiplier(null)
+      setCurrentMultiplier(1)
+      setBotPlayers([])
+      return
+    }
+
+    crashTargetRef.current = activeSession.crashPoint
+    setTargetCrashMultiplier(activeSession.crashPoint)
+
+    if (activeSession.status === 'countdown') {
+      if (sessionState !== 'countdown') {
+        setSessionState('countdown')
+        setCollectedMultiplier(null)
+        setCurrentMultiplier(1)
+        setBotPlayers([])
+      }
+    } else if (activeSession.status === 'running') {
+      if (sessionState !== 'running') {
+        setSessionState('running')
+        setCollectedMultiplier(null)
+        setCurrentMultiplier(1)
+        setBotPlayers(generateBotPlayers(activeSession.crashPoint))
+      }
+    } else if (activeSession.status === 'cashed_out') {
+      setSessionState('cashed')
+    } else if (activeSession.status === 'crashed') {
+      setSessionState('crashed')
+      setCurrentMultiplier(activeSession.crashPoint)
+      setBotPlayers((prev) =>
+        prev.map((bot) =>
+          bot.status === 'cashed'
+            ? bot
+            : { ...bot, status: 'crashed' },
+        ),
+      )
+    }
+  }, [activeSession, sessionState])
+
+  // Poll for the user's session state so we can sync after reloads
   useEffect(() => {
     if (!mounted || !telegramUser) return
 
+    let cancelled = false
+
     const pollSession = async () => {
       try {
-        const response: CurrentSessionResponse = await gameApi.getCurrentSession()
-        const session = response.session as GlobalSession | null
-        
-        if (session) {
-          setGlobalSession(session)
-          
-          // Update local session state based on global session
-          if (session.status === 'countdown') {
-            // Always update countdown state when backend says countdown
-            if (sessionState !== 'countdown') {
-              setSessionState('countdown')
-              setCollectedMultiplier(null)
-            }
-            // Update countdown value
-            const remainingMs = session.countdownRemaining || 0
-            const remainingSeconds = Math.ceil(remainingMs / 1000)
-            setCountdown(Math.max(0, remainingSeconds))
-          } else if (session.status === 'running') {
-            if (sessionState !== 'running') {
-              // Session just started
-              setSessionState('running')
-              crashTargetRef.current = session.crashPoint
-              setTargetCrashMultiplier(session.crashPoint)
-              setCurrentMultiplier(1)
-              setCollectedMultiplier(null)
-              setCountdown(0)
-              
-              if (animationRef.current) {
-                animationRef.current.play()
-              }
-            }
-          } else if (session.status === 'finished') {
-            // Session finished - transition to idle state to wait for next countdown
-            if (sessionState === 'running' || sessionState === 'crashed') {
-              setSessionState('idle')
-              setCurrentMultiplier(session.crashPoint)
-              setCountdown(0)
-              if (animationRef.current) {
-                animationRef.current.stop()
-                animationRef.current.goToAndStop(0, true)
-              }
-            }
-            // Note: Next countdown will start automatically via backend
-            // Frontend will pick it up on next poll
-          }
-        } else {
-          // No active session - could be between sessions
-          setGlobalSession(null)
-          // Don't reset state here - let it transition naturally
-        }
+        const response = await gameApi.getCurrentSession()
+        if (cancelled) return
+        setActiveSession(response.session ?? null)
       } catch (error) {
         console.error('Failed to poll session:', error)
       }
     }
 
-    // Poll immediately and then every 500ms
     pollSession()
-    const interval = setInterval(pollSession, 500)
+    const interval = setInterval(pollSession, 2000)
     sessionPollIntervalRef.current = interval
 
     return () => {
+      cancelled = true
       if (sessionPollIntervalRef.current) {
         clearInterval(sessionPollIntervalRef.current)
       }
     }
-  }, [mounted, telegramUser, sessionState])
+  }, [mounted, telegramUser])
 
   // Update countdown display
   useEffect(() => {
-    if (sessionState === 'countdown' && globalSession) {
+    if (sessionState === 'countdown' && activeSession?.countdownEndsAt) {
       const updateCountdown = () => {
-        // Use countdownRemaining from backend if available (in milliseconds)
-        if (globalSession.countdownRemaining !== undefined) {
-          const remainingSeconds = Math.ceil(globalSession.countdownRemaining / 1000)
-          setCountdown(Math.max(0, remainingSeconds))
-        } else if (globalSession.countdownEndsAt) {
-          // Fallback to calculating from countdownEndsAt
-          const remaining = Math.max(0, globalSession.countdownEndsAt - Date.now())
-          setCountdown(Math.ceil(remaining / 1000))
-        }
+        const remaining = Math.max(0, activeSession.countdownEndsAt! - Date.now())
+        setCountdown(Math.ceil(remaining / 1000))
       }
-      
-      updateCountdown() // Update immediately
-      const interval = setInterval(updateCountdown, 100)
+
+      updateCountdown()
+      const interval = setInterval(updateCountdown, 150)
 
       return () => clearInterval(interval)
     } else if (sessionState !== 'countdown') {
       setCountdown(0)
     }
-  }, [sessionState, globalSession])
+  }, [sessionState, activeSession?.countdownEndsAt])
 
   useEffect(() => {
     if (!mounted) return
@@ -342,6 +389,14 @@ export default function Home() {
     }
   }, [activeTab, mounted, telegramUser])
 
+  useEffect(() => {
+    if (!selectedGiftId && inventory.length > 0) {
+      setSelectedGiftId(inventory[0].id)
+    } else if (inventory.length === 0) {
+      setSelectedGiftId(null)
+    }
+  }, [inventory, selectedGiftId])
+
   const gradientOverlay = useMemo(
     () =>
       'before:pointer-events-none before:absolute before:inset-0 before:bg-[radial-gradient(circle_at_top,rgba(99,102,241,0.35),transparent_65%),radial-gradient(circle_at_bottom,rgba(236,72,153,0.2),transparent_55%)] before:opacity-80',
@@ -378,97 +433,101 @@ export default function Home() {
   const sessionMessage = useMemo(() => {
     switch (sessionState) {
       case 'countdown':
-        if (globalSession?.hasJoined) {
-          return `Joined! Session starting in ${countdown}s...`
-        }
-        return `Join session in ${countdown}s...`
+        return `Session starting in ${countdown}s...`
       case 'running':
-        if (!globalSession?.hasJoined) {
-          return 'Session in progress (you did not join)'
-        }
         if (collectedMultiplier !== null) {
           return `You collected at ${collectedMultiplier.toFixed(2)}x - Watching rocket...`
         }
         return `Live multiplier: ${currentMultiplier.toFixed(2)}x`
       case 'cashed':
-        return `You collected at ${collectedMultiplier?.toFixed(2)}x - Rocket crashed at ${(targetCrashMultiplier ?? currentMultiplier).toFixed(2)}x`
+        return `You collected at ${(collectedMultiplier ?? currentMultiplier).toFixed(2)}x - Rocket crashed at ${(targetCrashMultiplier ?? currentMultiplier).toFixed(2)}x`
       case 'crashed':
         return `Rocket crashed at ${(targetCrashMultiplier ?? currentMultiplier).toFixed(2)}x`
       default:
         return 'Waiting for next session...'
     }
-  }, [collectedMultiplier, currentMultiplier, sessionState, targetCrashMultiplier, globalSession, countdown])
+  }, [collectedMultiplier, currentMultiplier, sessionState, targetCrashMultiplier, countdown])
 
-  const players = useMemo(
-    () => [
-      { name: 'Anastasia', amount: '7 TON', icon: '⭐', status: 'Bet' },
-      { name: 'Raphael', amount: '1 TON', icon: '⚡', status: 'Bet' },
-      {
-        name: 'You',
-        amount:
-          sessionState === 'running' && collectedMultiplier !== null
-            ? `${collectedMultiplier.toFixed(2)}x`
-            : sessionState === 'running' || sessionState === 'cashed' || sessionState === 'crashed'
-              ? `${currentMultiplier.toFixed(2)}x`
-              : '—',
-        icon: '🧑',
-        status:
-          sessionState === 'running' && collectedMultiplier !== null
+  const players = useMemo(() => {
+    const botEntries = botPlayers.map((bot) => ({
+      name: bot.name,
+      amount: `${bot.cashOutPoint.toFixed(2)}x`,
+      icon: '🤖',
+      status:
+        bot.status === 'cashed'
+          ? `Cashed at ${bot.cashOutPoint.toFixed(2)}x`
+          : bot.status === 'crashed'
+            ? 'Crashed'
+            : sessionState === 'countdown'
+              ? 'Ready'
+              : 'In flight',
+    }))
+
+    const youEntry = {
+      name: 'You',
+      amount:
+        collectedMultiplier !== null
+          ? `${collectedMultiplier.toFixed(2)}x`
+          : sessionState === 'running'
+            ? `${currentMultiplier.toFixed(2)}x`
+            : '—',
+      icon: '🧑',
+      status:
+        sessionState === 'running' && collectedMultiplier === null
+          ? 'Live'
+          : sessionState === 'running'
             ? 'Collected'
-            : sessionState === 'running'
-              ? 'Live'
-              : sessionState === 'cashed'
-                ? 'Collected'
-                : sessionState === 'crashed'
-                  ? 'Crashed'
+            : sessionState === 'cashed'
+              ? `Collected ${collectedMultiplier?.toFixed(2) ?? ''}x`
+              : sessionState === 'crashed'
+                ? 'Crashed'
+                : sessionState === 'countdown'
+                  ? `Starting in ${countdown}s`
                   : 'Ready',
-      },
-    ],
-    [collectedMultiplier, currentMultiplier, sessionState]
-  )
-
-  const handleJoinSession = useCallback(async () => {
-    // Allow joining if either local state or global session says countdown
-    if (sessionState !== 'countdown' && globalSession?.status !== 'countdown') {
-      return
     }
 
-    if (globalSession?.hasJoined) {
-      return // Already joined
-    }
+    return [...botEntries, youEntry]
+  }, [botPlayers, sessionState, collectedMultiplier, currentMultiplier, countdown])
 
-    // If no gift selected, show inventory to select one
-    if (!selectedGiftId && inventory.length > 0) {
-      // Auto-select first gift if available
-      setSelectedGiftId(inventory[0].id)
+  const handleStartSession = useCallback(async () => {
+    if (!['idle', 'crashed', 'cashed'].includes(sessionState)) {
       return
     }
 
     if (!selectedGiftId) {
+      if (inventory.length > 0) {
+        setSelectedGiftId(inventory[0].id)
+      }
       alert('Please select a gift from your inventory first')
       return
     }
 
     try {
-      await gameApi.joinSession(selectedGiftId)
-      // Session state will update via polling
+      const response = await gameApi.startSession(selectedGiftId)
+      setActiveSession(response.session)
+      setCollectedMultiplier(null)
+      setSessionState('countdown')
     } catch (error: any) {
-      console.error('Failed to join session:', error)
-      alert(error.message || 'Failed to join session')
+      console.error('Failed to start session:', error)
+      alert(error.message || 'Failed to start session')
     }
-  }, [sessionState, globalSession, selectedGiftId, inventory])
+  }, [inventory, selectedGiftId, sessionState])
 
-  const handleCollect = useCallback(() => {
-    if (sessionState !== 'running' || collectedMultiplier !== null) return
-    
-    // Check if user joined the session
-    if (globalSession && !globalSession.hasJoined) {
-      alert('You did not join this session during the countdown period')
-      return
+  const handleCollect = useCallback(async () => {
+    if (sessionState !== 'running' || collectedMultiplier !== null || !activeSession) return
+
+    try {
+      await gameApi.cashOut(activeSession.id)
+      setCollectedMultiplier(currentMultiplier)
+      setSessionState('cashed')
+      setActiveSession((prev) =>
+        prev ? { ...prev, status: 'cashed_out', cashedOutAt: Date.now() } : prev,
+      )
+    } catch (error: any) {
+      console.error('Failed to collect:', error)
+      alert(error.message || 'Failed to collect')
     }
-
-    setCollectedMultiplier(currentMultiplier)
-  }, [collectedMultiplier, currentMultiplier, sessionState, globalSession])
+  }, [activeSession, collectedMultiplier, currentMultiplier, sessionState])
 
   useEffect(() => {
     if (sessionState === 'running') {
@@ -479,6 +538,30 @@ export default function Home() {
 
     setBeamAnimation(false)
   }, [sessionState])
+
+  useEffect(() => {
+    if (sessionState === 'running') {
+      setBotPlayers((prev) =>
+        prev.map((bot) => {
+          if (bot.status === 'cashed' || bot.status === 'crashed') {
+            return bot
+          }
+
+          if (currentMultiplier >= bot.cashOutPoint) {
+            return { ...bot, status: 'cashed', cashedAt: bot.cashOutPoint }
+          }
+
+          return { ...bot, status: 'flying' }
+        }),
+      )
+    } else if (sessionState === 'countdown') {
+      setBotPlayers((prev) =>
+        prev.map((bot) =>
+          bot.status === 'cashed' ? bot : { ...bot, status: 'countdown' },
+        ),
+      )
+    }
+  }, [currentMultiplier, sessionState])
 
   const sessionStartTimeRef = useRef<number>(0)
   const isRunningRef = useRef<boolean>(false)
@@ -523,8 +606,8 @@ export default function Home() {
         next = parseFloat((2 * Math.pow(acceleratingRate, timeAfter2x)).toFixed(2))
       }
 
-      // Use global session crash point if available, otherwise use local
-      const targetCrash = globalSession?.crashPoint || crashTargetRef.current
+      // Use server crash point if available, otherwise use local reference
+      const targetCrash = activeSession?.crashPoint ?? crashTargetRef.current
       
       if (next >= targetCrash) {
         isRunningRef.current = false
@@ -550,7 +633,7 @@ export default function Home() {
       isRunningRef.current = false
       cancelAnimationFrame(rafId)
     }
-  }, [sessionState, globalSession?.crashPoint])
+  }, [sessionState, activeSession?.crashPoint])
 
   useEffect(() => {
     if (!animationRef.current) return
@@ -609,20 +692,15 @@ export default function Home() {
     return () => window.removeEventListener('resize', updateIndicatorPosition)
   }, [activeIndex, mounted])
 
+  const canStartSession = ['idle', 'crashed', 'cashed'].includes(sessionState)
   const launchLabel =
     sessionState === 'countdown'
-      ? globalSession?.hasJoined
-        ? `Joined (${countdown}s)`
-        : `Join Session (${countdown}s)`
+      ? `Countdown (${countdown}s)`
       : sessionState === 'running'
         ? 'Running...'
-        : sessionState === 'crashed'
-          ? 'Next Session Soon'
-          : sessionState === 'cashed'
-            ? 'Next Session Soon'
-            : globalSession?.status === 'countdown'
-              ? `Join Session (${countdown}s)`
-              : 'Waiting for next session...'
+        : canStartSession
+          ? 'Start Session'
+          : 'Preparing...'
   const collectLabel =
     sessionState === 'running' && collectedMultiplier !== null
       ? `Collected at ${collectedMultiplier.toFixed(2)}x`
@@ -634,7 +712,7 @@ export default function Home() {
   const collectDisabled: boolean = 
     sessionState !== 'running' || 
     collectedMultiplier !== null ||
-    (globalSession ? !globalSession.hasJoined : false)
+    !activeSession
 
   if (!mounted) {
     return (
@@ -755,17 +833,7 @@ export default function Home() {
                     <div className="grid grid-cols-2 gap-4">
                       {inventory.map((gift) => {
                         const isProcessing = gift.gift_url && !gift.animation_data
-                        // Handle animation_data - it might be a string (JSON) or object
-                        let animationData = null
-                        if (gift.animation_data) {
-                          try {
-                            animationData = typeof gift.animation_data === 'string' 
-                              ? JSON.parse(gift.animation_data) 
-                              : gift.animation_data
-                          } catch (e) {
-                            console.warn('Failed to parse animation_data for gift:', gift.id, e)
-                          }
-                        }
+                        const animationData = parseAnimationData(gift.animation_data, gift.id)
                         
                         return (
                           <div
@@ -937,12 +1005,14 @@ export default function Home() {
               </div>
               <div className="mt-6 text-center text-sm font-medium text-white/80">{sessionMessage}</div>
 
-              {/* Gift Selection - shown during countdown */}
-              {sessionState === 'countdown' && !globalSession?.hasJoined && inventory.length > 0 && (
+              {/* Gift Selection - show whenever we're waiting to start */}
+              {sessionState !== 'running' && inventory.length > 0 && (
                 <section className="mt-4 w-full">
-                  <p className="mb-2 text-xs text-white/60 text-center">Select a gift to join:</p>
+                  <p className="mb-2 text-xs text-white/60 text-center">Select a gift to launch with:</p>
                   <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide">
-                    {inventory.slice(0, 5).map((gift) => (
+                    {inventory.slice(0, 5).map((gift) => {
+                      const animationData = parseAnimationData(gift.animation_data, gift.id)
+                      return (
                       <button
                         key={gift.id}
                         onClick={() => setSelectedGiftId(gift.id)}
@@ -953,18 +1023,16 @@ export default function Home() {
                         }`}
                       >
                         <div className="h-12 w-12 flex items-center justify-center">
-                          {gift.animation_data ? (
-                            <Lottie
-                              animationData={typeof gift.animation_data === 'string' 
-                                ? JSON.parse(gift.animation_data) 
-                                : gift.animation_data}
-                              loop={true}
-                              autoplay={true}
-                              style={{ width: '48px', height: '48px' }}
-                            />
-                          ) : (
-                            <span className="text-2xl">🎁</span>
-                          )}
+                            {animationData ? (
+                              <Lottie
+                                animationData={animationData}
+                                loop={true}
+                                autoplay={true}
+                                style={{ width: '48px', height: '48px' }}
+                              />
+                            ) : (
+                              <span className="text-2xl">🎁</span>
+                            )}
                         </div>
                         {gift.name && (
                           <p className="mt-1 text-xs text-white/80 truncate max-w-[60px]">
@@ -972,7 +1040,8 @@ export default function Home() {
                           </p>
                         )}
                       </button>
-                    ))}
+                      )
+                    })}
                   </div>
                 </section>
               )}
@@ -981,14 +1050,8 @@ export default function Home() {
               <section className="mt-6 flex gap-3">
                 <button
                   className="btn flex-1 min-w-[120px] py-3 text-base font-bold disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:transform-none"
-                  onClick={(sessionState === 'countdown' || globalSession?.status === 'countdown') ? handleJoinSession : undefined}
-                  disabled={
-                    sessionState === 'running' || 
-                    sessionState === 'crashed' || 
-                    sessionState === 'cashed' || 
-                    (globalSession?.status === 'countdown' && globalSession?.hasJoined === true) ||
-                    (globalSession?.status !== 'countdown' && sessionState !== 'countdown' && globalSession?.status !== 'finished')
-                  }
+                  onClick={handleStartSession}
+                  disabled={!canStartSession}
                 >
                   {launchLabel}
                 </button>

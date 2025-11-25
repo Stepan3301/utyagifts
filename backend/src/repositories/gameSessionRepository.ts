@@ -4,13 +4,16 @@ export interface CreateSessionData {
   userId: string
   giftId: string
   multiplier: number
-  status: 'active' | 'crashed' | 'cashed_out'
+  status: 'countdown' | 'running' | 'crashed' | 'cashed_out'
+  countdownEndsAt: number
+  startedAt?: number
 }
 
 export interface UpdateSessionData {
-  status?: 'active' | 'crashed' | 'cashed_out'
+  status?: 'countdown' | 'running' | 'crashed' | 'cashed_out'
   crashedAt?: number
   cashedOutAt?: number
+  startedAt?: number
 }
 
 class GameSessionRepository {
@@ -37,20 +40,32 @@ class GameSessionRepository {
       .from('game_sessions')
       .select('*')
       .eq('user_id', userId)
-      .eq('status', 'active')
+      .in('status', ['countdown', 'running'])
       .order('created_at', { ascending: false })
       .limit(1)
-      .single()
+      .maybeSingle()
 
     if (error) {
-      if (error.code === 'PGRST116') {
-        // No rows returned
-        return null
-      }
       throw error
     }
 
-    return data
+    return data ?? null
+  }
+
+  async findLatestByUserId(userId: string): Promise<DBGameSession | null> {
+    const { data, error } = await supabase
+      .from('game_sessions')
+      .select('*')
+      .eq('user_id', userId)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle()
+
+    if (error) {
+      throw error
+    }
+
+    return data ?? null
   }
 
   async findByUserId(userId: string, limit: number, offset: number): Promise<DBGameSession[]> {
@@ -76,6 +91,8 @@ class GameSessionRepository {
         gift_id: data.giftId,
         multiplier: data.multiplier,
         status: data.status,
+        countdown_ends_at: new Date(data.countdownEndsAt).toISOString(),
+        started_at: data.startedAt ? new Date(data.startedAt).toISOString() : null,
       })
       .select()
       .single()
@@ -100,6 +117,9 @@ class GameSessionRepository {
     }
     if (data.cashedOutAt !== undefined) {
       updateData.cashed_out_at = new Date(data.cashedOutAt).toISOString()
+    }
+    if (data.startedAt !== undefined) {
+      updateData.started_at = new Date(data.startedAt).toISOString()
     }
 
     const { data: session, error } = await supabase

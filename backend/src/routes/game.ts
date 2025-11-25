@@ -19,9 +19,6 @@ gameRouter.get('/session/active', gameController.getActiveSession);
 // Get session history
 gameRouter.get('/session/history', gameController.getSessionHistory);
 
-// Get current global session status
+// Get current session status for the authenticated user
 gameRouter.get('/session/current', gameController.getCurrentSession);
-
-// Join current session (during countdown)
-gameRouter.post('/session/join', gameController.joinSession);
 
