@@ -132,19 +132,28 @@ class SessionManagerService {
    */
   joinSession(userId: string): boolean {
     if (!this.currentSession) {
+      console.warn(`[SessionManager] Cannot join: No active session`);
       return false;
     }
 
     if (this.currentSession.status !== 'countdown') {
+      console.warn(`[SessionManager] Cannot join: Session status is ${this.currentSession.status}, not countdown`);
       return false; // Can only join during countdown
     }
 
     if (this.currentSession.countdownEndsAt && Date.now() >= this.currentSession.countdownEndsAt) {
+      console.warn(`[SessionManager] Cannot join: Countdown ended`);
       return false; // Countdown ended
     }
 
+    // Check if already joined
+    if (this.currentSession.joinedUsers.has(userId)) {
+      console.log(`[SessionManager] User ${userId} already joined session ${this.currentSession.id}`);
+      return true; // Already joined, return true
+    }
+
     this.currentSession.joinedUsers.add(userId);
-    console.log(`✅ User ${userId} joined session ${this.currentSession.id}`);
+    console.log(`✅ User ${userId} joined session ${this.currentSession.id} (${this.currentSession.joinedUsers.size} total)`);
     return true;
   }
 

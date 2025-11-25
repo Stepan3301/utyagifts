@@ -58,8 +58,9 @@ app.use('/api/gifts', giftProcessingRouter);
 app.use(errorHandler);
 
 // 404 handler
-app.use((_req, res) => {
-  res.status(404).json({ error: 'Not found' });
+app.use((req, res) => {
+  console.warn(`[404] Route not found: ${req.method} ${req.path}`);
+  res.status(404).json({ error: 'Not found', path: req.path, method: req.method });
 });
 
 // Initialize Telegram bot
@@ -71,9 +72,16 @@ telegramService.initialize().catch((error) => {
 app.listen(PORT, () => {
   console.log(`🚀 Server running on port ${PORT}`);
   console.log(`📱 Environment: ${process.env.NODE_ENV || 'development'}`);
+  console.log(`📡 Routes registered:`);
+  console.log(`   - GET  /api/health`);
+  console.log(`   - POST /api/gifts/process-all`);
+  console.log(`   - GET  /api/game/session/current`);
+  console.log(`   - POST /api/game/session/join`);
   
   // Start continuous session manager
+  console.log(`🎮 Initializing session manager...`);
   sessionManagerService.start();
+  console.log(`✅ Session manager started`);
 });
 
 // Cleanup on shutdown

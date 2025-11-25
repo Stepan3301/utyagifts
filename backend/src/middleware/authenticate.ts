@@ -19,6 +19,7 @@ export const authenticate = async (
     const authHeader = req.headers.authorization;
     
     if (!authHeader) {
+      console.warn(`[Auth] No authorization header for ${req.method} ${req.path}`);
       res.status(401).json({ error: 'Unauthorized' });
       return;
     }
@@ -47,16 +48,35 @@ export const authenticate = async (
       try {
         // Simple parsing: look for user_id in initData
         const params = new URLSearchParams(token);
-        const userIdStr = params.get('user') 
-          ? JSON.parse(decodeURIComponent(params.get('user')!)).id
-          : null;
+        const userParam = params.get('user');
         
-        if (userIdStr) {
-          telegramId = parseInt(userIdStr, 10);
+        if (userParam) {
+          try {
+            const userObj = JSON.parse(decodeURIComponent(userParam));
+            if (userObj && userObj.id) {
+              telegramId = parseInt(userObj.id, 10);
+            }
+          } catch (parseError) {
+            // Try direct parsing if JSON parse fails
+            console.warn('Failed to parse user object from initData:', parseError);
+          }
+        }
+        
+        // If still no telegramId, try to extract from raw token (might be just user ID)
+        if (!telegramId) {
+          const directId = parseInt(token, 10);
+          if (!isNaN(directId)) {
+            telegramId = directId;
+          }
         }
       } catch (error) {
         // If parsing fails, try to extract from token directly
-        console.warn('Failed to parse initData, trying alternative methods');
+        console.warn('Failed to parse initData, trying alternative methods:', error);
+        // Last resort: try parsing token as direct user ID
+        const directId = parseInt(token, 10);
+        if (!isNaN(directId)) {
+          telegramId = directId;
+        }
       }
     }
 
@@ -69,6 +89,7 @@ export const authenticate = async (
     const user = await userRepository.findByTelegramId(telegramId);
     
     if (!user) {
+      console.warn(`[Auth] User not found for telegramId: ${telegramId}`);
       res.status(401).json({ error: 'User not found' });
       return;
     }
@@ -81,9 +102,14 @@ export const authenticate = async (
       lastName: user.last_name || undefined,
     };
 
+    // Log successful authentication (only in development)
+    if (process.env.NODE_ENV !== 'production') {
+      console.log(`[Auth] Authenticated user ${telegramId} for ${req.method} ${req.path}`);
+    }
+
     next();
   } catch (error) {
-    console.error('Authentication error:', error);
+    console.error('[Auth] Authentication error:', error);
     res.status(401).json({ error: 'Invalid authentication' });
   }
 };

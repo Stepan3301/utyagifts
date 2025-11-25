@@ -181,8 +181,15 @@ export default function Home() {
           
           // Update local session state based on global session
           if (session.status === 'countdown') {
-            setSessionState('countdown')
-            setCountdown(Math.ceil(session.countdownRemaining / 1000))
+            // Always update countdown state when backend says countdown
+            if (sessionState !== 'countdown') {
+              setSessionState('countdown')
+              setCollectedMultiplier(null)
+            }
+            // Update countdown value
+            const remainingMs = session.countdownRemaining || 0
+            const remainingSeconds = Math.ceil(remainingMs / 1000)
+            setCountdown(Math.max(0, remainingSeconds))
           } else if (session.status === 'running') {
             if (sessionState !== 'running') {
               // Session just started
@@ -191,18 +198,21 @@ export default function Home() {
               setTargetCrashMultiplier(session.crashPoint)
               setCurrentMultiplier(1)
               setCollectedMultiplier(null)
+              setCountdown(0)
               
               if (animationRef.current) {
                 animationRef.current.play()
               }
             }
           } else if (session.status === 'finished') {
-            // Session finished - transition to crashed state briefly
-            if (sessionState === 'running') {
-              setSessionState('crashed')
+            // Session finished - transition to idle state to wait for next countdown
+            if (sessionState === 'running' || sessionState === 'crashed') {
+              setSessionState('idle')
               setCurrentMultiplier(session.crashPoint)
+              setCountdown(0)
               if (animationRef.current) {
                 animationRef.current.stop()
+                animationRef.current.goToAndStop(0, true)
               }
             }
             // Note: Next countdown will start automatically via backend
@@ -232,10 +242,17 @@ export default function Home() {
 
   // Update countdown display
   useEffect(() => {
-    if (sessionState === 'countdown' && globalSession?.countdownEndsAt) {
+    if (sessionState === 'countdown' && globalSession) {
       const updateCountdown = () => {
-        const remaining = Math.max(0, globalSession.countdownEndsAt! - Date.now())
-        setCountdown(Math.ceil(remaining / 1000))
+        // Use countdownRemaining from backend if available (in milliseconds)
+        if (globalSession.countdownRemaining !== undefined) {
+          const remainingSeconds = Math.ceil(globalSession.countdownRemaining / 1000)
+          setCountdown(Math.max(0, remainingSeconds))
+        } else if (globalSession.countdownEndsAt) {
+          // Fallback to calculating from countdownEndsAt
+          const remaining = Math.max(0, globalSession.countdownEndsAt - Date.now())
+          setCountdown(Math.ceil(remaining / 1000))
+        }
       }
       
       updateCountdown() // Update immediately
@@ -260,15 +277,23 @@ export default function Home() {
       const processAllGifts = async () => {
         try {
           console.log('🔄 Processing all unprocessed gifts...')
-          await giftProcessingApi.processAllUnprocessed()
-          console.log('✅ Finished processing gifts')
+          const result = await giftProcessingApi.processAllUnprocessed()
+          console.log('✅ Finished processing gifts:', result)
+          
+          // Refetch inventory after processing
+          try {
+            const updatedResponse: InventoryResponse = await inventoryApi.getInventory()
+            setInventory(updatedResponse.inventory || [])
+          } catch (fetchError) {
+            console.error('Failed to refetch inventory after processing:', fetchError)
+          }
         } catch (error: any) {
-          console.warn('Failed to process unprocessed gifts:', error.message)
-          // Don't block app if processing fails
+          console.warn('Failed to process unprocessed gifts:', error.message || error)
+          // Don't block app if processing fails - might be auth issue or no gifts to process
         }
       }
       // Process gifts after a short delay to ensure user is authenticated
-      setTimeout(processAllGifts, 1000)
+      setTimeout(processAllGifts, 2000)
     }
   }, [mounted, telegramUser])
 
@@ -286,19 +311,18 @@ export default function Home() {
           const needsProcessing = gifts.some(g => g.gift_url && !g.animation_data)
           if (needsProcessing) {
             // Trigger processing in background
-            giftProcessingApi.processAllUnprocessed().catch(err => {
-              console.warn('Background processing failed:', err)
-            })
-            
-            // Refetch after processing completes (give it time)
-            setTimeout(async () => {
-              try {
-                const updatedResponse: InventoryResponse = await inventoryApi.getInventory()
+            giftProcessingApi.processAllUnprocessed()
+              .then((result) => {
+                console.log('Background processing completed:', result)
+                // Refetch inventory after processing
+                return inventoryApi.getInventory()
+              })
+              .then((updatedResponse: InventoryResponse) => {
                 setInventory(updatedResponse.inventory || [])
-              } catch (error) {
-                console.error('Failed to refetch inventory:', error)
-              }
-            }, 5000) // Wait 5 seconds for processing to complete
+              })
+              .catch(err => {
+                console.warn('Background processing failed:', err)
+              })
           }
         } catch (error: any) {
           console.error('Failed to fetch inventory:', error)
@@ -404,7 +428,8 @@ export default function Home() {
   )
 
   const handleJoinSession = useCallback(async () => {
-    if (sessionState !== 'countdown') {
+    // Allow joining if either local state or global session says countdown
+    if (sessionState !== 'countdown' && globalSession?.status !== 'countdown') {
       return
     }
 
@@ -595,7 +620,9 @@ export default function Home() {
           ? 'Next Session Soon'
           : sessionState === 'cashed'
             ? 'Next Session Soon'
-            : 'Waiting...'
+            : globalSession?.status === 'countdown'
+              ? `Join Session (${countdown}s)`
+              : 'Waiting for next session...'
   const collectLabel =
     sessionState === 'running' && collectedMultiplier !== null
       ? `Collected at ${collectedMultiplier.toFixed(2)}x`
@@ -954,8 +981,14 @@ export default function Home() {
               <section className="mt-6 flex gap-3">
                 <button
                   className="btn flex-1 min-w-[120px] py-3 text-base font-bold disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:transform-none"
-                  onClick={sessionState === 'countdown' ? handleJoinSession : undefined}
-                  disabled={sessionState === 'running' || sessionState === 'crashed' || sessionState === 'cashed' || (sessionState === 'countdown' && globalSession?.hasJoined)}
+                  onClick={(sessionState === 'countdown' || globalSession?.status === 'countdown') ? handleJoinSession : undefined}
+                  disabled={
+                    sessionState === 'running' || 
+                    sessionState === 'crashed' || 
+                    sessionState === 'cashed' || 
+                    (globalSession?.status === 'countdown' && globalSession?.hasJoined === true) ||
+                    (globalSession?.status !== 'countdown' && sessionState !== 'countdown' && globalSession?.status !== 'finished')
+                  }
                 >
                   {launchLabel}
                 </button>
