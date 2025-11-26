@@ -1,22 +1,24 @@
 import { createClient } from '@supabase/supabase-js'
 
-if (!process.env.SUPABASE_URL) {
+const supabaseUrl = process.env.SUPABASE_URL
+const supabaseAnonKey = process.env.SUPABASE_ANON_KEY
+const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
+
+if (!supabaseUrl) {
   throw new Error('Missing SUPABASE_URL environment variable')
 }
 
-if (!process.env.SUPABASE_ANON_KEY) {
-  throw new Error('Missing SUPABASE_ANON_KEY environment variable')
+if (!supabaseAnonKey && !supabaseServiceKey) {
+  throw new Error('Missing SUPABASE_ANON_KEY or SUPABASE_SERVICE_ROLE_KEY environment variable')
 }
 
-export const supabase = createClient(
-  process.env.SUPABASE_URL,
-  process.env.SUPABASE_ANON_KEY,
-  {
-    auth: {
-      persistSession: false, // We're using server-side, no session persistence needed
-    },
-  }
-)
+const supabaseKey = supabaseServiceKey ?? supabaseAnonKey!
+
+export const supabase = createClient(supabaseUrl, supabaseKey, {
+  auth: {
+    persistSession: false, // We're using server-side, no session persistence needed
+  },
+})
 
 // Database types (matching Supabase schema)
 export interface Database {
@@ -65,6 +67,7 @@ export interface Database {
           gift_url: string | null // Telegram gift URL
           external_url: string | null
           rarity: string | null
+          animation_tgs_path: string | null
           created_at: string
           updated_at: string
         }
@@ -78,6 +81,7 @@ export interface Database {
           gift_url?: string | null
           external_url?: string | null
           rarity?: string | null
+          animation_tgs_path?: string | null
           created_at?: string
           updated_at?: string
         }
@@ -91,6 +95,7 @@ export interface Database {
           gift_url?: string | null
           external_url?: string | null
           rarity?: string | null
+          animation_tgs_path?: string | null
           created_at?: string
           updated_at?: string
         }

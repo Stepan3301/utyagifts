@@ -222,6 +222,7 @@ export interface InventoryResponse {
     image_url: string | null
     animation_url: string | null
     animation_data: any | null
+    animation_tgs_path: string | null
     gift_url: string | null
     external_url: string | null
     rarity: string | null
@@ -238,6 +239,7 @@ export interface GiftResponse {
     image_url: string | null
     animation_url: string | null
     animation_data: any | null
+    animation_tgs_path: string | null
     gift_url: string | null
     external_url: string | null
     rarity: string | null

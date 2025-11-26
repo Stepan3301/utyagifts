@@ -15,6 +15,8 @@ export interface UpdateGiftData {
   name?: string
   animationData?: any // Lottie JSON object
   giftUrl?: string // Telegram gift URL
+  imageUrl?: string | null
+  animationTgsPath?: string | null
 }
 
 class GiftRepository {
@@ -122,6 +124,14 @@ class GiftRepository {
 
     if (data.giftUrl !== undefined) {
       updateData.gift_url = data.giftUrl
+    }
+
+    if (data.imageUrl !== undefined) {
+      updateData.image_url = data.imageUrl
+    }
+
+    if (data.animationTgsPath !== undefined) {
+      updateData.animation_tgs_path = data.animationTgsPath
     }
 
     const { data: gift, error } = await supabase

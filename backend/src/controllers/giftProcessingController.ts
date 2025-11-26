@@ -30,12 +30,14 @@ export const giftProcessingController = {
       }
 
       // Process the gift URL to extract animation data
-      const processedData = await giftProcessingService.processGiftUrl(giftUrl);
+      const processedData = await giftProcessingService.processGiftUrl(giftUrl, { giftId });
 
       res.json({
         success: true,
         animationData: processedData.animationData,
         tgsUrl: processedData.tgsUrl,
+        previewImageUrl: processedData.previewImageUrl,
+        tgsStoragePath: processedData.tgsStoragePath,
       });
     } catch (error) {
       console.error('Error processing gift URL:', error);
@@ -88,6 +90,8 @@ export const giftProcessingController = {
       await giftRepository.update(giftId, {
         animationData: processedData.animationData,
         giftUrl: giftUrl,
+        imageUrl: processedData.previewImageUrl ?? undefined,
+        animationTgsPath: processedData.tgsStoragePath ?? undefined,
       });
 
       res.json({
@@ -138,11 +142,15 @@ export const giftProcessingController = {
         unprocessedGifts.map(async (gift: any) => {
           try {
             console.log(`Processing gift ${gift.id}: ${gift.gift_url}`);
-            const processedData = await giftProcessingService.processGiftUrl(gift.gift_url);
+            const processedData = await giftProcessingService.processGiftUrl(gift.gift_url, {
+              giftId: gift.id,
+            });
             
             await giftRepository.update(gift.id, {
               animationData: processedData.animationData,
               giftUrl: gift.gift_url,
+              imageUrl: processedData.previewImageUrl ?? undefined,
+              animationTgsPath: processedData.tgsStoragePath ?? undefined,
             });
 
             return { giftId: gift.id, success: true };

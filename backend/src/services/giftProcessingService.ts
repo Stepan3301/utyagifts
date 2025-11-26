@@ -4,15 +4,19 @@ import puppeteer, { Browser, Page } from 'puppeteer-core';
 import { existsSync } from 'fs';
 import { join } from 'path';
 import { execSync } from 'child_process';
+import { supabase } from '../lib/supabase';
 
 export interface ProcessedGiftData {
   animationData: any; // Lottie JSON object
   tgsUrl: string | null;
+  previewImageUrl: string | null;
+  tgsStoragePath: string | null;
 }
 
 class GiftProcessingService {
   private browser: Browser | null = null;
   private browserPromise: Promise<Browser> | null = null;
+  private readonly animationsBucket = process.env.GIFT_ANIMATION_BUCKET ?? 'gift-animations';
 
   /**
    * Try to resolve a Chromium/Chrome executable path.
@@ -185,7 +189,7 @@ class GiftProcessingService {
   /**
    * Download and decompress .tgs file to Lottie JSON
    */
-  private async downloadAndDecompressTgs(tgsUrl: string): Promise<any> {
+  private async downloadAndDecompressTgs(tgsUrl: string): Promise<{ animationData: any; buffer: Buffer }> {
     try {
       const response = await axios.get(tgsUrl, {
         responseType: 'arraybuffer',
@@ -200,17 +204,60 @@ class GiftProcessingService {
       const jsonStr = pako.inflate(tgsBuffer, { to: 'string' });
       const animationData = JSON.parse(jsonStr);
 
-      return animationData;
+      return { animationData, buffer: tgsBuffer };
     } catch (error) {
       console.error('Error downloading/decompressing .tgs file:', error);
       throw new Error(`Failed to process .tgs file: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   }
 
+  private async fetchPreviewImage(giftUrl: string): Promise<string | null> {
+    try {
+      const response = await axios.get(giftUrl, {
+        headers: {
+          'User-Agent':
+            'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        },
+      });
+
+      const html = response.data as string;
+      const match = html.match(/<meta\s+property=["']og:image["']\s+content=["']([^"']+)["']/i);
+      if (match && match[1]) {
+        return match[1].trim();
+      }
+    } catch (error) {
+      console.warn('Failed to fetch preview image for gift:', giftUrl, error);
+    }
+
+    return null;
+  }
+
+  private async uploadTgsToStorage(tgsBuffer: Buffer, giftId: string): Promise<string | null> {
+    try {
+      const objectPath = `gifts/${giftId}.tgs`;
+      const { error } = await supabase.storage
+        .from(this.animationsBucket)
+        .upload(objectPath, tgsBuffer, {
+          contentType: 'application/x-tgsticker',
+          upsert: true,
+        });
+
+      if (error) {
+        console.warn('Failed to upload TGS to storage:', error);
+        return null;
+      }
+
+      return objectPath;
+    } catch (error) {
+      console.warn('Unexpected error uploading TGS to storage:', error);
+      return null;
+    }
+  }
+
   /**
    * Process Telegram gift URL to extract animation data
    */
-  async processGiftUrl(giftUrl: string): Promise<ProcessedGiftData> {
+  async processGiftUrl(giftUrl: string, options?: { giftId?: string }): Promise<ProcessedGiftData> {
     try {
       // Validate URL format
       if (!giftUrl || !giftUrl.startsWith('https://t.me/nft/')) {
@@ -218,6 +265,8 @@ class GiftProcessingService {
       }
 
       console.log(`🔗 Processing gift URL: ${giftUrl}`);
+
+      const previewImageUrl = await this.fetchPreviewImage(giftUrl);
 
       // 1. Extract .tgs URL using Puppeteer (required because page loads dynamically)
       console.log('🌐 Extracting .tgs URL using Puppeteer...');
@@ -229,12 +278,22 @@ class GiftProcessingService {
 
       // 2. Download and decompress .tgs to Lottie JSON
       console.log('💾 Downloading and decompressing .tgs file...');
-      const animationData = await this.downloadAndDecompressTgs(tgsUrl);
+      const { animationData, buffer } = await this.downloadAndDecompressTgs(tgsUrl);
       console.log('✅ Animation data extracted successfully');
+
+      let tgsStoragePath: string | null = null;
+      if (options?.giftId) {
+        tgsStoragePath = await this.uploadTgsToStorage(buffer, options.giftId);
+        if (!tgsStoragePath) {
+          console.warn('TGS upload skipped or failed for gift:', options.giftId);
+        }
+      }
 
       return {
         animationData,
         tgsUrl,
+        previewImageUrl,
+        tgsStoragePath,
       };
     } catch (error) {
       console.error('❌ Error processing gift URL:', error);

@@ -5,7 +5,7 @@ import WebApp from '@twa-dev/sdk'
 import Lottie, { type LottieRefCurrentProps } from 'lottie-react'
 
 import rocketAnimation from '@/public/animations/rocket.json'
-import { authApi, inventoryApi, giftProcessingApi, gameApi, type InventoryResponse, type GameSessionPayload } from '@/lib/api'
+import { authApi, inventoryApi, giftProcessingApi, type InventoryResponse } from '@/lib/api'
 
 type Gift = InventoryResponse['inventory'][number]
 
@@ -97,17 +97,83 @@ const BOT_NAMES = [
   'Rex',
   'Tara',
 ]
-const MIN_BOT_COUNT = 5
-const MAX_BOT_COUNT = 10
 
-type SessionState = 'idle' | 'countdown' | 'running' | 'cashed' | 'crashed'
+
+const PLAYER_AVATARS = [
+  '/avatars/1a.jpg',
+  '/avatars/2a.jpg',
+  '/avatars/3a.jpg',
+  '/avatars/5a.jpg',
+  '/avatars/6a.jpg',
+  '/avatars/7a.jpg',
+  '/avatars/8a.jpg',
+  '/avatars/11a.jpg',
+  '/avatars/12a.jpg',
+  '/avatars/13a.jpg',
+  '/avatars/15a.jpg',
+  '/avatars/16a.jpg',
+  '/avatars/33a.jpg',
+  '/avatars/44v.jpg',
+  '/avatars/77a.jpg',
+  '/avatars/122a.jpg',
+  '/avatars/123a.jpg',
+  '/avatars/133a.jpg',
+  '/avatars/143a.jpg',
+  '/avatars/154a.jpg',
+  '/avatars/bb2.jpg',
+  '/avatars/bbb2.jpg',
+  '/avatars/cc3.jpg',
+  '/avatars/cxz.jpg',
+  '/avatars/gg2.jpg',
+  '/avatars/zzz1.jpg',
+]
+
+const FAKE_USERNAMES = [
+  'StarWhale',
+  'CryptoLion',
+  'LunaSpark',
+  'OrbitAce',
+  'PixelPilot',
+  'MoonWalker',
+  'GalaxyNova',
+  'ZenithFox',
+  'RocketMira',
+  'AstroIvy',
+  'Skylark',
+  'SolarTide',
+  'PulseRay',
+  'NebulaCat',
+  'IonWave',
+  'QuasarJay',
+  'TurboLynx',
+  'VortexRay',
+  'DriftKing',
+  'EchoByte',
+  'OrbitRow',
+  'HyperNova',
+  'Stardust',
+  'CometRex',
+  'PhotonBee',
+  'MetalPunk',
+  'RocketRosa',
+  'VantaRay',
+  'ZenPulse',
+]
+const MIN_BOT_COUNT = 5
+const MAX_BOT_COUNT = 30
+
+type SessionState = 'idle' | 'countdown' | 'running' | 'crashed'
 
 interface BotPlayer {
   id: string
   name: string
+  username: string
+  avatar: string
+  betTon: number
   cashOutPoint: number
   status: 'countdown' | 'flying' | 'cashed' | 'crashed'
   cashedAt?: number
+  result?: 'won' | 'lost'
 }
 
 const parseAnimationData = (raw: unknown, giftId: string): any | null => {
@@ -131,6 +197,12 @@ const parseAnimationData = (raw: unknown, giftId: string): any | null => {
     return null
   }
 }
+
+const getRandomItem = <T,>(collection: T[]): T =>
+  collection[Math.floor(Math.random() * collection.length)]
+
+const getRandomBetween = (min: number, max: number, precision = 2): number =>
+  parseFloat((Math.random() * (max - min) + min).toFixed(precision))
 
 // Cache for first frame images
 const firstFrameCache = new Map<string, string>()
@@ -254,6 +326,8 @@ const extractFirstFrame = async (animationData: any, giftId: string, size = 256)
 const generateBotPlayers = (crashPoint: number): BotPlayer[] => {
   const botCount = Math.floor(Math.random() * (MAX_BOT_COUNT - MIN_BOT_COUNT + 1)) + MIN_BOT_COUNT
   const namesPool = [...BOT_NAMES].sort(() => Math.random() - 0.5)
+  const usernamesPool = [...FAKE_USERNAMES].sort(() => Math.random() - 0.5)
+  const avatarPool = [...PLAYER_AVATARS].sort(() => Math.random() - 0.5)
   const crashBuffer = Math.max(0.05, crashPoint * 0.1)
   const maxSafePoint = Math.max(1.0, parseFloat((crashPoint - crashBuffer).toFixed(2)))
   const minSafePoint = Math.max(1.0, parseFloat((maxSafePoint - 0.35).toFixed(2)))
@@ -262,10 +336,16 @@ const generateBotPlayers = (crashPoint: number): BotPlayer[] => {
     const span = Math.max(0.01, maxSafePoint - minSafePoint)
     const rawPoint = minSafePoint + Math.random() * span
     const cashOutPoint = parseFloat(Math.max(1.0, Math.min(rawPoint, maxSafePoint)).toFixed(2))
+    const avatar = avatarPool[index % avatarPool.length]
+    const baseName = namesPool[index % namesPool.length] ?? `Bot ${index + 1}`
+    const usernameHandle = usernamesPool[index % usernamesPool.length] ?? `@bot${index + 1}`
 
     return {
       id: `bot-${Date.now()}-${index}`,
-      name: namesPool[index % namesPool.length] ?? `Bot ${index + 1}`,
+      name: baseName,
+      username: usernameHandle.startsWith('@') ? usernameHandle : `@${usernameHandle}`,
+      avatar,
+      betTon: getRandomBetween(0.2, 25, 2),
       cashOutPoint,
       status: 'countdown' as const,
     }
@@ -346,6 +426,55 @@ function LottieFirstFrame({ animationData, giftId, className = '', alt = 'Gift' 
   )
 }
 
+function GiftAnimationPlayer({
+  animationData,
+  className = '',
+  playKey,
+  onComplete,
+}: {
+  animationData: any
+  className?: string
+  playKey: number
+  onComplete?: () => void
+}) {
+  const animationRef = useRef<LottieRefCurrentProps>(null)
+
+  useEffect(() => {
+    if (!playKey || !animationRef.current) {
+      return
+    }
+
+    const instance = animationRef.current
+    const eventTarget = instance as {
+      addEventListener?: (event: string, cb: () => void) => void
+      removeEventListener?: (event: string, cb: () => void) => void
+    }
+    const handleComplete = () => {
+      onComplete?.()
+    }
+
+    instance.goToAndStop(0, true)
+    instance.setSpeed?.(1)
+    instance.play()
+    eventTarget.addEventListener?.('complete', handleComplete)
+
+    return () => {
+      eventTarget.removeEventListener?.('complete', handleComplete)
+      instance.stop()
+    }
+  }, [playKey, onComplete])
+
+  return (
+    <Lottie
+      lottieRef={animationRef}
+      animationData={animationData}
+      loop={false}
+      autoplay={false}
+      className={className}
+    />
+  )
+}
+
 export default function Home() {
   const [mounted, setMounted] = useState(false)
   const [activeTab, setActiveTab] = useState<string>('home')
@@ -357,17 +486,17 @@ export default function Home() {
   const [collectedMultiplier, setCollectedMultiplier] = useState<number | null>(null)
   const [inventory, setInventory] = useState<Gift[]>([])
   const [loadingInventory, setLoadingInventory] = useState(false)
-  const [activeSession, setActiveSession] = useState<GameSessionPayload | null>(null)
   const [countdown, setCountdown] = useState(0)
   const [selectedGiftId, setSelectedGiftId] = useState<string | null>(null)
   const [isQueuedForNextSession, setIsQueuedForNextSession] = useState(false)
-  const [preSessionCountdown, setPreSessionCountdown] = useState<number | null>(null)
+  const [isUserInCurrentSession, setIsUserInCurrentSession] = useState(false)
+  const [activeGiftAnimation, setActiveGiftAnimation] = useState<{ id: string; key: number } | null>(null)
   const [botPlayers, setBotPlayers] = useState<BotPlayer[]>([])
   const animationRef = useRef<LottieRefCurrentProps>(null)
   const crashTargetRef = useRef<number>(10)
+  const countdownEndsAtRef = useRef<number | null>(null)
   const navRef = useRef<HTMLElement | null>(null)
   const navItemsRef = useRef<(HTMLButtonElement | null)[]>([])
-  const sessionPollIntervalRef = useRef<NodeJS.Timeout | null>(null)
 
   useEffect(() => {
     if (typeof window === 'undefined') return
@@ -415,93 +544,84 @@ export default function Home() {
     initializeApp()
   }, [])
 
+  const startCountdownCycle = useCallback((durationSeconds = 10) => {
+    const crashPoint = getRandomBetween(1.4, 12, 2)
+    crashTargetRef.current = crashPoint
+    countdownEndsAtRef.current = Date.now() + durationSeconds * 1000
+    setTargetCrashMultiplier(crashPoint)
+    setSessionState('countdown')
+    setCountdown(durationSeconds)
+    setCurrentMultiplier(1)
+    setCollectedMultiplier(null)
+    setIsUserInCurrentSession(false)
+    setBotPlayers(generateBotPlayers(crashPoint))
+  }, [])
+
   useEffect(() => {
-    if (!activeSession) {
-      setSessionState('idle')
-      setTargetCrashMultiplier(null)
-      setCountdown(0)
-      setCollectedMultiplier(null)
-      setCurrentMultiplier(1)
-      setBotPlayers([])
-      return
-    }
+    if (!mounted) return
+    if (countdownEndsAtRef.current) return
+    startCountdownCycle()
+  }, [mounted, startCountdownCycle])
 
-    crashTargetRef.current = activeSession.crashPoint
-    setTargetCrashMultiplier(activeSession.crashPoint)
-
-    if (activeSession.status === 'countdown') {
-            if (sessionState !== 'countdown') {
-              setSessionState('countdown')
-              setCollectedMultiplier(null)
-        setCurrentMultiplier(1)
-        setBotPlayers([])
-      }
-    } else if (activeSession.status === 'running') {
-            if (sessionState !== 'running') {
-              setSessionState('running')
-              setCollectedMultiplier(null)
-        setCurrentMultiplier(1)
-        setBotPlayers(generateBotPlayers(activeSession.crashPoint))
-            }
-    } else if (activeSession.status === 'cashed_out') {
-      setSessionState('cashed')
-    } else if (activeSession.status === 'crashed') {
-      setSessionState('crashed')
-      setCurrentMultiplier(activeSession.crashPoint)
-      setBotPlayers((prev) =>
-        prev.map((bot) =>
-          bot.status === 'cashed'
-            ? bot
-            : { ...bot, status: 'crashed' },
-        ),
-      )
-    }
-  }, [activeSession, sessionState])
-
-  // Poll for the user's session state so we can sync after reloads
   useEffect(() => {
-    if (!mounted || !telegramUser) return
+    if (!mounted) return
+    if (sessionState !== 'crashed') return
 
-    let cancelled = false
+    const timer = setTimeout(() => {
+      startCountdownCycle()
+    }, 4000)
 
-    const pollSession = async () => {
-      try {
-        const response = await gameApi.getCurrentSession()
-        if (cancelled) return
-        setActiveSession(response.session ?? null)
-      } catch (error) {
-        console.error('Failed to poll session:', error)
-      }
-    }
-
-    pollSession()
-    const interval = setInterval(pollSession, 2000)
-    sessionPollIntervalRef.current = interval
-
-    return () => {
-      cancelled = true
-      if (sessionPollIntervalRef.current) {
-        clearInterval(sessionPollIntervalRef.current)
-      }
-    }
-  }, [mounted, telegramUser])
+    return () => clearTimeout(timer)
+  }, [mounted, sessionState, startCountdownCycle])
 
   // Update countdown display
   useEffect(() => {
-    if (sessionState === 'countdown' && activeSession?.countdownEndsAt) {
-      const updateCountdown = () => {
-        const remaining = Math.max(0, activeSession.countdownEndsAt! - Date.now())
-          setCountdown(Math.ceil(remaining / 1000))
+    if (sessionState !== 'countdown' || !countdownEndsAtRef.current) {
+      if (sessionState !== 'countdown') {
+        setCountdown(0)
       }
-      
-      updateCountdown()
-      const interval = setInterval(updateCountdown, 150)
-
-      return () => clearInterval(interval)
-    } else if (sessionState !== 'countdown') {
-      setCountdown(0)
+      return
     }
-  }, [sessionState, activeSession?.countdownEndsAt])
+
+    const updateCountdown = () => {
+      if (!countdownEndsAtRef.current) return
+      const remaining = Math.max(0, countdownEndsAtRef.current - Date.now())
+      setCountdown(Math.ceil(remaining / 1000))
+    }
+
+    updateCountdown()
+    const interval = setInterval(updateCountdown, 200)
+    return () => clearInterval(interval)
+  }, [sessionState])
+
+  useEffect(() => {
+    if (sessionState !== 'countdown') return
+    if (countdown > 0) return
+
+    countdownEndsAtRef.current = null
+    setSessionState('running')
+    setCurrentMultiplier(1)
+    setCollectedMultiplier(null)
+    setBotPlayers((prev) =>
+      prev.map((bot) =>
+        bot.status === 'cashed'
+          ? bot
+          : {
+              ...bot,
+              status: 'flying',
+              cashedAt: undefined,
+              result: undefined,
+            },
+      ),
+    )
+
+    if (isQueuedForNextSession) {
+      setIsUserInCurrentSession(true)
+      setIsQueuedForNextSession(false)
+    } else {
+      setIsUserInCurrentSession(false)
+    }
+  }, [countdown, isQueuedForNextSession, sessionState])
 
   useEffect(() => {
     if (!mounted) return
@@ -588,14 +708,13 @@ export default function Home() {
     }
   }, [inventory, selectedGiftId])
 
+  const triggerGiftAnimation = useCallback((giftId: string) => {
+    setActiveGiftAnimation({ id: giftId, key: Date.now() })
+  }, [])
 
-  useEffect(() => {
-    if (!['idle', 'crashed', 'cashed'].includes(sessionState)) {
-      setIsQueuedForNextSession(false)
-      setPreSessionCountdown(null)
-    }
-  }, [sessionState])
-
+  const handleGiftAnimationComplete = useCallback(() => {
+    setActiveGiftAnimation(null)
+  }, [])
   const gradientOverlay = useMemo(
     () =>
       'before:pointer-events-none before:absolute before:inset-0 before:bg-[radial-gradient(circle_at_top,rgba(99,102,241,0.35),transparent_65%),radial-gradient(circle_at_bottom,rgba(236,72,153,0.2),transparent_55%)] before:opacity-80',
@@ -629,56 +748,60 @@ export default function Home() {
     return `${Math.min(value, MAX_MULTIPLIER).toFixed(2)}x`
   }, [currentMultiplier, sessionState, targetCrashMultiplier])
 
-  const canStartSession = ['idle', 'crashed', 'cashed'].includes(sessionState)
+  const canJoinSession = sessionState === 'countdown'
 
   const sessionMessage = useMemo(() => {
-    if (canStartSession && isQueuedForNextSession && preSessionCountdown !== null) {
-      return `Session queued. Launching in ${preSessionCountdown}s...`
-    }
-
     switch (sessionState) {
       case 'countdown':
-        return `Session starting in ${countdown}s...`
+        return isQueuedForNextSession
+          ? `You're locked in! Launching in ${countdown}s...`
+          : `Next session begins in ${countdown}s`
       case 'running':
         if (collectedMultiplier !== null) {
           return `You collected at ${collectedMultiplier.toFixed(2)}x - Watching rocket...`
         }
         return `Live multiplier: ${currentMultiplier.toFixed(2)}x`
-      case 'cashed':
-        return `You collected at ${(collectedMultiplier ?? currentMultiplier).toFixed(2)}x - Rocket crashed at ${(targetCrashMultiplier ?? currentMultiplier).toFixed(2)}x`
       case 'crashed':
         return `Rocket crashed at ${(targetCrashMultiplier ?? currentMultiplier).toFixed(2)}x`
       default:
         return 'Waiting for next session...'
     }
   }, [
-    canStartSession,
     collectedMultiplier,
     countdown,
     currentMultiplier,
     isQueuedForNextSession,
-    preSessionCountdown,
     sessionState,
     targetCrashMultiplier,
   ])
 
+  const defaultAvatar = PLAYER_AVATARS[0]
+
   const players = useMemo(() => {
     const botEntries = botPlayers.map((bot) => ({
+      id: bot.id,
       name: bot.name,
+      username: bot.username,
+      avatar: bot.avatar,
+      bet: `${bot.betTon.toFixed(2)} TON`,
       amount: `${bot.cashOutPoint.toFixed(2)}x`,
       icon: '🤖',
       status:
         bot.status === 'cashed'
-          ? `Cashed at ${bot.cashOutPoint.toFixed(2)}x`
+          ? `Won at ${bot.cashOutPoint.toFixed(2)}x`
           : bot.status === 'crashed'
-            ? 'Crashed'
+            ? 'Lost'
             : sessionState === 'countdown'
               ? 'Ready'
               : 'In flight',
     }))
 
     const youEntry = {
+      id: 'you',
       name: 'You',
+      username: telegramUser?.username ? `@${telegramUser.username}` : '@you',
+      avatar: telegramUser?.photo_url ?? botPlayers[0]?.avatar ?? defaultAvatar,
+      bet: isUserInCurrentSession ? '1.00 TON' : '—',
       amount:
         collectedMultiplier !== null
           ? `${collectedMultiplier.toFixed(2)}x`
@@ -686,19 +809,17 @@ export default function Home() {
             ? `${currentMultiplier.toFixed(2)}x`
             : '—',
       icon: '🧑',
-      status: isQueuedForNextSession && preSessionCountdown !== null
-        ? `Joining in ${preSessionCountdown}s`
-        : sessionState === 'running' && collectedMultiplier === null
+      status: isQueuedForNextSession && sessionState === 'countdown'
+        ? `Joining in ${countdown}s`
+        : isUserInCurrentSession && sessionState === 'running' && collectedMultiplier === null
           ? 'Live'
-          : sessionState === 'running'
-            ? 'Collected'
-            : sessionState === 'cashed'
-              ? `Collected ${collectedMultiplier?.toFixed(2) ?? ''}x`
-              : sessionState === 'crashed'
-                ? 'Crashed'
-                : sessionState === 'countdown'
-                  ? `Starting in ${countdown}s`
-                  : 'Ready',
+          : collectedMultiplier !== null
+            ? `Collected ${collectedMultiplier.toFixed(2)}x`
+            : sessionState === 'crashed'
+              ? 'Missed'
+              : sessionState === 'countdown'
+                ? 'Ready'
+                : 'Watching',
     }
 
     return [...botEntries, youEntry]
@@ -708,12 +829,43 @@ export default function Home() {
     collectedMultiplier,
     currentMultiplier,
     isQueuedForNextSession,
-    preSessionCountdown,
+    isUserInCurrentSession,
     sessionState,
+    telegramUser?.username,
+    telegramUser?.photo_url,
   ])
 
+  const activePlayerCount = useMemo(
+    () => botPlayers.length + (isUserInCurrentSession ? 1 : 0),
+    [botPlayers, isUserInCurrentSession],
+  )
+
+  const playerChips = useMemo(() => {
+    return botPlayers.map((bot) => {
+      let tone = 'text-white/60'
+      let statusLabel = `Target ${bot.cashOutPoint.toFixed(2)}x`
+
+      if (bot.status === 'cashed') {
+        tone = 'text-green-400'
+        statusLabel = `Won @ ${bot.cashOutPoint.toFixed(2)}x`
+      } else if (bot.status === 'crashed') {
+        tone = 'text-red-400'
+        statusLabel = 'Lost this round'
+      }
+
+      return {
+        id: bot.id,
+        avatar: bot.avatar,
+        username: bot.username,
+        bet: `${bot.betTon.toFixed(2)} TON`,
+        tone,
+        statusLabel,
+      }
+    })
+  }, [botPlayers])
+
   const queueNextSession = useCallback(() => {
-    if (!canStartSession || isQueuedForNextSession) {
+    if (sessionState !== 'countdown' || isQueuedForNextSession) {
       return
     }
 
@@ -726,73 +878,16 @@ export default function Home() {
     }
 
     setIsQueuedForNextSession(true)
-    setPreSessionCountdown(10)
-  }, [canStartSession, inventory, isQueuedForNextSession, selectedGiftId])
+  }, [inventory, isQueuedForNextSession, selectedGiftId, sessionState])
 
   const cancelQueuedSession = useCallback(() => {
     setIsQueuedForNextSession(false)
-    setPreSessionCountdown(null)
   }, [])
 
-  const handleStartSession = useCallback(async () => {
-    if (!['idle', 'crashed', 'cashed'].includes(sessionState)) {
-      return
-    }
-
-    if (!selectedGiftId) {
-      if (inventory.length > 0) {
-        setSelectedGiftId(inventory[0].id)
-      }
-      alert('Please select a gift from your inventory first')
-      return
-    }
-
-    try {
-      const response = await gameApi.startSession(selectedGiftId)
-      setActiveSession(response.session)
-      setCollectedMultiplier(null)
-      setSessionState('countdown')
-    } catch (error: any) {
-      console.error('Failed to start session:', error)
-      alert(error.message || 'Failed to start session')
-    }
-  }, [inventory, selectedGiftId, sessionState])
-
-  const handleCollect = useCallback(async () => {
-    if (sessionState !== 'running' || collectedMultiplier !== null || !activeSession) return
-
-    try {
-      await gameApi.cashOut(activeSession.id)
-      setCollectedMultiplier(currentMultiplier)
-      setSessionState('cashed')
-      setActiveSession((prev) =>
-        prev ? { ...prev, status: 'cashed_out', cashedOutAt: Date.now() } : prev,
-      )
-    } catch (error: any) {
-      console.error('Failed to collect:', error)
-      alert(error.message || 'Failed to collect')
-    }
-  }, [activeSession, collectedMultiplier, currentMultiplier, sessionState])
-
-  // Manage pre-session countdown when user queues up
-  useEffect(() => {
-    if (!isQueuedForNextSession || preSessionCountdown === null) {
-      return
-    }
-
-    if (preSessionCountdown <= 0) {
-      setIsQueuedForNextSession(false)
-      setPreSessionCountdown(null)
-      handleStartSession()
-      return
-    }
-
-    const timer = setTimeout(() => {
-      setPreSessionCountdown((prev) => (prev !== null ? Math.max(prev - 1, 0) : null))
-    }, 1000)
-
-    return () => clearTimeout(timer)
-  }, [handleStartSession, isQueuedForNextSession, preSessionCountdown])
+  const handleCollect = useCallback(() => {
+    if (sessionState !== 'running' || collectedMultiplier !== null) return
+    setCollectedMultiplier(currentMultiplier)
+  }, [collectedMultiplier, currentMultiplier, sessionState])
 
   useEffect(() => {
     if (sessionState === 'running') {
@@ -813,7 +908,12 @@ export default function Home() {
           }
 
           if (currentMultiplier >= bot.cashOutPoint) {
-            return { ...bot, status: 'cashed', cashedAt: bot.cashOutPoint }
+            return {
+              ...bot,
+              status: 'cashed',
+              cashedAt: bot.cashOutPoint,
+              result: 'won',
+            }
           }
 
           return { ...bot, status: 'flying' }
@@ -822,7 +922,9 @@ export default function Home() {
     } else if (sessionState === 'countdown') {
       setBotPlayers((prev) =>
         prev.map((bot) =>
-          bot.status === 'cashed' ? bot : { ...bot, status: 'countdown' },
+          bot.status === 'cashed'
+            ? bot
+            : { ...bot, status: 'countdown', result: undefined },
         ),
       )
     }
@@ -871,13 +973,21 @@ export default function Home() {
         next = parseFloat((2 * Math.pow(acceleratingRate, timeAfter2x)).toFixed(2))
       }
 
-      // Use server crash point if available, otherwise use local reference
-      const targetCrash = activeSession?.crashPoint ?? crashTargetRef.current
+      const targetCrash = targetCrashMultiplier ?? crashTargetRef.current
       
       if (next >= targetCrash) {
         isRunningRef.current = false
-        setCurrentMultiplier(parseFloat(targetCrash.toFixed(2)))
-        // Don't set state to crashed here - let polling handle it
+        const finalValue = parseFloat(targetCrash.toFixed(2))
+        setCurrentMultiplier(finalValue)
+        setSessionState('crashed')
+        setBotPlayers((prev) =>
+          prev.map((bot) =>
+            bot.status === 'cashed'
+              ? { ...bot, result: 'won' }
+              : { ...bot, status: 'crashed', result: 'lost' },
+          ),
+        )
+        setIsUserInCurrentSession(false)
         return
       }
 
@@ -885,6 +995,14 @@ export default function Home() {
         isRunningRef.current = false
         setCurrentMultiplier(MAX_MULTIPLIER)
         setSessionState('crashed')
+        setBotPlayers((prev) =>
+          prev.map((bot) =>
+            bot.status === 'cashed'
+              ? { ...bot, result: 'won' }
+              : { ...bot, status: 'crashed', result: 'lost' },
+          ),
+        )
+        setIsUserInCurrentSession(false)
         return
       }
 
@@ -898,7 +1016,7 @@ export default function Home() {
       isRunningRef.current = false
       cancelAnimationFrame(rafId)
     }
-  }, [sessionState, activeSession?.crashPoint])
+  }, [sessionState, targetCrashMultiplier])
 
   useEffect(() => {
     if (!animationRef.current) return
@@ -959,7 +1077,7 @@ export default function Home() {
 
   const joinButtonLabel = isQueuedForNextSession ? 'Cancel Join' : 'Join Next Session'
   const joinButtonDisabled =
-    !isQueuedForNextSession && (!canStartSession || inventory.length === 0)
+    !isQueuedForNextSession && (!canJoinSession || inventory.length === 0)
   const inventoryCountLabel = loadingInventory
     ? 'Loading...'
     : `${inventory.length} item${inventory.length === 1 ? '' : 's'}`
@@ -968,13 +1086,11 @@ export default function Home() {
       ? `Collected at ${collectedMultiplier.toFixed(2)}x`
       : sessionState === 'running'
         ? `Collect ${currentMultiplier.toFixed(2)}x`
-        : sessionState === 'cashed'
-          ? 'Collected'
-          : 'Collect'
+        : 'Collect'
   const collectDisabled: boolean = 
     sessionState !== 'running' || 
     collectedMultiplier !== null ||
-    !activeSession
+    !isUserInCurrentSession
 
   if (!mounted) {
     return (
@@ -1097,11 +1213,18 @@ export default function Home() {
                         const isProcessing = gift.gift_url && !gift.animation_data
                         const animationData = parseAnimationData(gift.animation_data, gift.id)
                         const hasStaticPreview = Boolean(gift.image_url)
+                        const isPlaying = activeGiftAnimation?.id === gift.id
                         
                         return (
-                          <div
+                          <button
+                            type="button"
                             key={gift.id}
-                            className="relative rounded-2xl border border-white/10 bg-white/5 aspect-square overflow-hidden backdrop-blur-lg hover:bg-white/10 transition-all"
+                            onClick={() => {
+                              if (animationData) {
+                                triggerGiftAnimation(gift.id)
+                              }
+                            }}
+                            className="relative rounded-2xl border border-white/10 bg-white/5 aspect-square overflow-hidden backdrop-blur-lg hover:bg-white/10 transition-all text-left"
                           >
                             {isProcessing && !animationData && !hasStaticPreview ? (
                               <div className="w-full h-full flex flex-col items-center justify-center p-4">
@@ -1110,12 +1233,21 @@ export default function Home() {
                               </div>
                             ) : animationData ? (
                               <div className="w-full h-full flex items-center justify-center p-2">
-                                <LottieFirstFrame
-                                  animationData={animationData}
-                                  giftId={gift.id}
-                                  className="w-full h-full object-contain"
-                                  alt={gift.name || 'Gift'}
-                                />
+                                {isPlaying && activeGiftAnimation ? (
+                                  <GiftAnimationPlayer
+                                    animationData={animationData}
+                                    playKey={activeGiftAnimation.key}
+                                    className="w-full h-full object-contain"
+                                    onComplete={handleGiftAnimationComplete}
+                                  />
+                                ) : (
+                                  <LottieFirstFrame
+                                    animationData={animationData}
+                                    giftId={gift.id}
+                                    className="w-full h-full object-contain"
+                                    alt={gift.name || 'Gift'}
+                                  />
+                                )}
                               </div>
                             ) : gift.image_url ? (
                               <img
@@ -1133,7 +1265,7 @@ export default function Home() {
                                 <p className="text-white text-xs font-medium truncate">{gift.name}</p>
                               </div>
                             )}
-                          </div>
+                          </button>
                         )
                       })}
                     </div>
@@ -1275,10 +1407,16 @@ export default function Home() {
                   <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide">
                     {inventory.slice(0, 5).map((gift) => {
                       const animationData = parseAnimationData(gift.animation_data, gift.id)
+                      const isPlaying = activeGiftAnimation?.id === gift.id
                       return (
                       <button
                         key={gift.id}
-                        onClick={() => setSelectedGiftId(gift.id)}
+                        onClick={() => {
+                          setSelectedGiftId(gift.id)
+                          if (animationData) {
+                            triggerGiftAnimation(gift.id)
+                          }
+                        }}
                         className={`flex-shrink-0 rounded-xl border-2 p-2 transition-all ${
                           selectedGiftId === gift.id
                             ? 'border-blue-400 bg-blue-400/20'
@@ -1287,12 +1425,21 @@ export default function Home() {
                       >
                         <div className="h-12 w-12 flex items-center justify-center">
                             {animationData ? (
-                            <LottieFirstFrame
+                            isPlaying && activeGiftAnimation ? (
+                              <GiftAnimationPlayer
+                                animationData={animationData}
+                                playKey={activeGiftAnimation.key}
+                                className="w-12 h-12 object-contain"
+                                onComplete={handleGiftAnimationComplete}
+                              />
+                            ) : (
+                              <LottieFirstFrame
                                 animationData={animationData}
                                 giftId={gift.id}
                                 className="w-12 h-12 object-contain"
                                 alt={gift.name || 'Gift'}
-                            />
+                              />
+                            )
                           ) : gift.image_url ? (
                             <img
                               src={gift.image_url}
@@ -1315,6 +1462,35 @@ export default function Home() {
                 </section>
               )}
 
+              {/* Live players under rocket */}
+              {playerChips.length > 0 && (
+                <section className="mt-4 w-full">
+                  <div className="flex items-center justify-between text-xs text-white/60 mb-2">
+                    <span>{activePlayerCount} players in session</span>
+                    <span>Live bets</span>
+                  </div>
+                  <div className="flex gap-3 overflow-x-auto pb-2 scrollbar-hide">
+                    {playerChips.map((chip) => (
+                      <div
+                        key={chip.id}
+                        className="flex-shrink-0 flex items-center gap-2 rounded-2xl border border-white/10 bg-white/5 px-3 py-2 backdrop-blur-md min-w-[150px]"
+                      >
+                        <img
+                          src={chip.avatar}
+                          alt={chip.username}
+                          className="h-10 w-10 rounded-full object-cover border border-white/20"
+                        />
+                        <div className="text-xs">
+                          <p className="font-semibold text-white truncate max-w-[90px]">{chip.username}</p>
+                          <p className="text-white/70">{chip.bet}</p>
+                          <p className={`text-[11px] ${chip.tone}`}>{chip.statusLabel}</p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </section>
+              )}
+
               {/* Actions - moved below game frame */}
               <section className="mt-6 flex gap-3">
                 <button
@@ -1332,9 +1508,9 @@ export default function Home() {
                   {collectLabel}
                 </button>
               </section>
-              {isQueuedForNextSession && preSessionCountdown !== null && (
+              {isQueuedForNextSession && sessionState === 'countdown' && (
                 <p className="mt-2 text-center text-sm text-white/70">
-                  Next session begins in {preSessionCountdown}s
+                  You'll join the next launch in {countdown}s
                 </p>
               )}
 
@@ -1343,19 +1519,24 @@ export default function Home() {
                 <section className="mt-6 space-y-3">
                   {players.map((player) => (
                     <div
-                      key={player.name}
+                      key={player.id}
                       className="flex items-center justify-between rounded-2xl border border-white/10 bg-white/10 px-4 py-3 text-sm font-medium text-white/90 shadow-[0_15px_35px_-15px_rgba(41,88,255,0.6)] backdrop-blur-lg"
                     >
                       <div className="flex items-center gap-3">
-                        <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-gradient-to-br from-white/25 to-white/5 text-lg">
-                          {player.icon}
-                        </div>
+                        <img
+                          src={player.avatar}
+                          alt={player.name}
+                          className="h-11 w-11 rounded-xl object-cover border border-white/20"
+                        />
                         <div>
                           <p className="text-base font-semibold">{player.name}</p>
                           <p className="text-xs text-white/60">{player.status}</p>
                         </div>
                       </div>
-                      <span className="text-base font-semibold text-blue-100">{player.amount}</span>
+                      <div className="text-right">
+                        <p className="text-base font-semibold text-blue-100">{player.bet}</p>
+                        <p className="text-xs text-white/60">{player.amount}</p>
+                      </div>
                     </div>
                   ))}
                 </section>
@@ -1399,23 +1580,38 @@ export default function Home() {
                     {inventory.map((gift) => {
                       const animationData = parseAnimationData(gift.animation_data, gift.id)
                       const isSelected = selectedGiftId === gift.id
+                      const isPlaying = activeGiftAnimation?.id === gift.id
                       return (
                         <button
                           key={gift.id}
                           type="button"
-                          onClick={() => setSelectedGiftId(gift.id)}
+                          onClick={() => {
+                            setSelectedGiftId(gift.id)
+                            if (animationData) {
+                              triggerGiftAnimation(gift.id)
+                            }
+                          }}
                           className={`flex-shrink-0 w-20 h-20 rounded-xl border p-2 transition-all ${
                             isSelected ? 'border-blue-400 bg-blue-400/20' : 'border-white/10 bg-white/5 hover:border-white/20'
                           }`}
                         >
                           <div className="w-full h-full flex items-center justify-center">
                             {animationData ? (
-                              <LottieFirstFrame
-                                animationData={animationData}
-                                giftId={gift.id}
-                                className="w-full h-full object-contain"
-                                alt={gift.name || 'Gift'}
-                              />
+                              isPlaying && activeGiftAnimation ? (
+                                <GiftAnimationPlayer
+                                  animationData={animationData}
+                                  playKey={activeGiftAnimation.key}
+                                  className="w-full h-full object-contain"
+                                  onComplete={handleGiftAnimationComplete}
+                                />
+                              ) : (
+                                <LottieFirstFrame
+                                  animationData={animationData}
+                                  giftId={gift.id}
+                                  className="w-full h-full object-contain"
+                                  alt={gift.name || 'Gift'}
+                                />
+                              )
                             ) : gift.image_url ? (
                               <img
                                 src={gift.image_url}
