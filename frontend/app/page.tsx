@@ -1,3 +1,4 @@
+/* eslint-disable @next/next/no-img-element */
 'use client'
 
 import { useCallback, useEffect, useMemo, useRef, useState, type JSX } from 'react'
@@ -754,7 +755,7 @@ export default function Home() {
     switch (sessionState) {
       case 'countdown':
         return isQueuedForNextSession
-          ? `You're locked in! Launching in ${countdown}s...`
+          ? `You&apos;re locked in! Launching in ${countdown}s...`
           : `Next session begins in ${countdown}s`
       case 'running':
         if (collectedMultiplier !== null) {
@@ -828,6 +829,7 @@ export default function Home() {
     countdown,
     collectedMultiplier,
     currentMultiplier,
+    defaultAvatar,
     isQueuedForNextSession,
     isUserInCurrentSession,
     sessionState,
@@ -1510,7 +1512,7 @@ export default function Home() {
               </section>
               {isQueuedForNextSession && sessionState === 'countdown' && (
                 <p className="mt-2 text-center text-sm text-white/70">
-                  You'll join the next launch in {countdown}s
+                  You&apos;ll join the next launch in {countdown}s
                 </p>
               )}
 
