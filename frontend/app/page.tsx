@@ -6,6 +6,7 @@ import WebApp from '@twa-dev/sdk'
 import Lottie, { type LottieRefCurrentProps } from 'lottie-react'
 
 import rocketAnimation from '@/public/animations/rocket.json'
+import arrowsAnimation from '@/public/animations/arrows.json'
 import { authApi, inventoryApi, giftProcessingApi, type InventoryResponse } from '@/lib/api'
 
 type Gift = InventoryResponse['inventory'][number]
@@ -1143,29 +1144,41 @@ export default function Home() {
                   <p className="text-white/70 mb-6">Ready to launch and collect amazing gifts?</p>
                   
                   <div className="space-y-4">
-                    <div className="rounded-2xl border border-white/10 bg-white/10 px-4 py-4 backdrop-blur-lg">
+                    <button
+                      type="button"
+                      onClick={() => setActiveTab('game')}
+                      className="w-full rounded-2xl border border-white/10 bg-white/10 px-4 py-4 backdrop-blur-lg hover:bg-white/15 transition-all text-left cursor-pointer"
+                    >
                       <div className="flex items-center gap-3 mb-2">
                         <span className="text-2xl">🎮</span>
                         <h3 className="text-lg font-semibold text-white">Game</h3>
                       </div>
                       <p className="text-sm text-white/60">Launch rockets and collect multipliers to win gifts!</p>
-                    </div>
+                    </button>
                     
-                    <div className="rounded-2xl border border-white/10 bg-white/10 px-4 py-4 backdrop-blur-lg">
+                    <button
+                      type="button"
+                      onClick={() => setActiveTab('gifts')}
+                      className="w-full rounded-2xl border border-white/10 bg-white/10 px-4 py-4 backdrop-blur-lg hover:bg-white/15 transition-all text-left cursor-pointer"
+                    >
                       <div className="flex items-center gap-3 mb-2">
                         <span className="text-2xl">🎁</span>
                         <h3 className="text-lg font-semibold text-white">Gifts</h3>
                       </div>
                       <p className="text-sm text-white/60">Browse and manage your collected gifts</p>
-                    </div>
+                    </button>
                     
-                    <div className="rounded-2xl border border-white/10 bg-white/10 px-4 py-4 backdrop-blur-lg">
+                    <button
+                      type="button"
+                      onClick={() => setActiveTab('stats')}
+                      className="w-full rounded-2xl border border-white/10 bg-white/10 px-4 py-4 backdrop-blur-lg hover:bg-white/15 transition-all text-left cursor-pointer"
+                    >
                       <div className="flex items-center gap-3 mb-2">
                         <span className="text-2xl">📊</span>
                         <h3 className="text-lg font-semibold text-white">Stats</h3>
                       </div>
                       <p className="text-sm text-white/60">Track your game performance and achievements</p>
-                    </div>
+                    </button>
                   </div>
                 </div>
               </div>
@@ -1217,28 +1230,28 @@ export default function Home() {
                                 <p className="text-white/60 text-xs text-center">Processing animation...</p>
                               </div>
                             ) : animationData ? (
-                              <div className="w-full h-full flex items-center justify-center p-2">
+                              <div className="w-full h-full flex items-center justify-center p-3">
                                 {isPlaying && activeGiftAnimation ? (
                                   <GiftAnimationPlayer
                                   animationData={animationData}
                                     playKey={activeGiftAnimation.key}
-                                    className="w-full h-full object-contain"
+                                    className="w-3/4 h-3/4 object-contain"
                                     onComplete={handleGiftAnimationComplete}
                                   />
                                 ) : (
                                   <LottieFirstFrame
                                     animationData={animationData}
                                     giftId={gift.id}
-                                    className="w-full h-full object-contain"
+                                    className="w-3/4 h-3/4 object-contain"
                                     alt={gift.name || 'Gift'}
-                                />
+                                  />
                                 )}
                               </div>
                             ) : gift.image_url ? (
                               <img
                                 src={gift.image_url}
                                 alt={gift.name || 'Gift'}
-                                className="w-full h-full object-contain p-2"
+                                className="w-full h-full object-contain p-3"
                               />
                             ) : (
                               <div className="w-full h-full flex items-center justify-center">
@@ -1246,8 +1259,8 @@ export default function Home() {
                               </div>
                             )}
                             {gift.name && (
-                              <div className="absolute bottom-0 left-0 right-0 bg-black/60 backdrop-blur-sm px-2 py-1">
-                                <p className="text-white text-xs font-medium truncate">{gift.name}</p>
+                              <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 via-black/70 to-transparent backdrop-blur-md px-3 py-2.5 rounded-b-2xl">
+                                <p className="text-white text-sm font-semibold truncate drop-shadow-lg">{gift.name}</p>
                               </div>
                             )}
                           </button>
@@ -1352,6 +1365,18 @@ export default function Home() {
             <section className="relative mt-6 flex flex-1 flex-col items-center justify-center">
               <div className={`relative flex h-[360px] w-full max-w-xs flex-col items-center justify-center overflow-hidden rounded-[32px] border border-white/10 px-7 py-8 shadow-[0_25px_60px_-20px_rgba(56,97,255,0.6)] backdrop-blur-[32px] transition-colors duration-700 ${gameAreaBackgroundClass}`}>
                 <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(255,255,255,0.12),transparent_65%)]" />
+
+                {/* Arrows animation - behind rocket, only when running and multiplier increasing */}
+                {sessionState === 'running' && collectedMultiplier === null && (
+                  <div className="absolute z-10 flex h-52 w-52 items-center justify-center">
+                    <Lottie
+                      animationData={arrowsAnimation}
+                      loop
+                      autoplay
+                      className="h-full w-full opacity-80"
+                    />
+                  </div>
+                )}
 
                 {/* Rocket */}
                 <div className="relative z-20 flex flex-col items-center justify-center">
