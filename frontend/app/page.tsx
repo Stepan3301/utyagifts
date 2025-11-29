@@ -10,6 +10,16 @@ import { authApi, inventoryApi, giftProcessingApi, type InventoryResponse } from
 
 type Gift = InventoryResponse['inventory'][number]
 
+const STATIC_ASSET_BASE_PATH =
+  process.env.NEXT_PUBLIC_BASE_PATH && process.env.NEXT_PUBLIC_BASE_PATH !== '/'
+    ? process.env.NEXT_PUBLIC_BASE_PATH
+    : ''
+
+const buildStaticAssetPath = (relativePath: string): string => {
+  const normalized = relativePath.startsWith('/') ? relativePath : `/${relativePath}`
+  return `${STATIC_ASSET_BASE_PATH}${normalized}`
+}
+
 const NAV_ITEMS: Array<{ label: string; id: string; icon: JSX.Element }> = [
   {
     label: 'Home',
@@ -127,7 +137,7 @@ const PLAYER_AVATARS = [
   '/avatars/cxz.jpg',
   '/avatars/gg2.jpg',
   '/avatars/zzz1.jpg',
-]
+].map(buildStaticAssetPath)
 
 const FAKE_USERNAMES = [
   'StarWhale',
@@ -480,7 +490,6 @@ export default function Home() {
   const [mounted, setMounted] = useState(false)
   const [activeTab, setActiveTab] = useState<string>('home')
   const [telegramUser, setTelegramUser] = useState<TelegramUser | null>(null)
-  const [beamAnimation, setBeamAnimation] = useState(false)
   const [sessionState, setSessionState] = useState<SessionState>('idle')
   const [currentMultiplier, setCurrentMultiplier] = useState(1)
   const [targetCrashMultiplier, setTargetCrashMultiplier] = useState<number | null>(null)
@@ -550,10 +559,10 @@ export default function Home() {
     crashTargetRef.current = crashPoint
     countdownEndsAtRef.current = Date.now() + durationSeconds * 1000
     setTargetCrashMultiplier(crashPoint)
-    setSessionState('countdown')
+              setSessionState('countdown')
     setCountdown(durationSeconds)
-    setCurrentMultiplier(1)
-    setCollectedMultiplier(null)
+        setCurrentMultiplier(1)
+              setCollectedMultiplier(null)
     setIsUserInCurrentSession(false)
     setBotPlayers(generateBotPlayers(crashPoint))
   }, [])
@@ -584,15 +593,15 @@ export default function Home() {
       return
     }
 
-    const updateCountdown = () => {
+      const updateCountdown = () => {
       if (!countdownEndsAtRef.current) return
       const remaining = Math.max(0, countdownEndsAtRef.current - Date.now())
-      setCountdown(Math.ceil(remaining / 1000))
-    }
-
-    updateCountdown()
+          setCountdown(Math.ceil(remaining / 1000))
+      }
+      
+      updateCountdown()
     const interval = setInterval(updateCountdown, 200)
-    return () => clearInterval(interval)
+      return () => clearInterval(interval)
   }, [sessionState])
 
   useEffect(() => {
@@ -623,13 +632,6 @@ export default function Home() {
       setIsUserInCurrentSession(false)
     }
   }, [countdown, isQueuedForNextSession, sessionState])
-
-  useEffect(() => {
-    if (!mounted) return
-
-    const timeout = setTimeout(() => setBeamAnimation(true), 300)
-    return () => clearTimeout(timeout)
-  }, [mounted])
 
   // Process all unprocessed gifts when app loads
   useEffect(() => {
@@ -799,26 +801,26 @@ export default function Home() {
 
     const youEntry = {
       id: 'you',
-      name: 'You',
+        name: 'You',
       username: telegramUser?.username ? `@${telegramUser.username}` : '@you',
       avatar: telegramUser?.photo_url ?? botPlayers[0]?.avatar ?? defaultAvatar,
       bet: isUserInCurrentSession ? '1.00 TON' : '—',
-      amount:
+        amount:
         collectedMultiplier !== null
-          ? `${collectedMultiplier.toFixed(2)}x`
+            ? `${collectedMultiplier.toFixed(2)}x`
           : sessionState === 'running'
-            ? `${currentMultiplier.toFixed(2)}x`
-            : '—',
-      icon: '🧑',
+              ? `${currentMultiplier.toFixed(2)}x`
+              : '—',
+        icon: '🧑',
       status: isQueuedForNextSession && sessionState === 'countdown'
         ? `Joining in ${countdown}s`
         : isUserInCurrentSession && sessionState === 'running' && collectedMultiplier === null
-          ? 'Live'
+              ? 'Live'
           : collectedMultiplier !== null
             ? `Collected ${collectedMultiplier.toFixed(2)}x`
-            : sessionState === 'crashed'
+                : sessionState === 'crashed'
               ? 'Missed'
-              : sessionState === 'countdown'
+                : sessionState === 'countdown'
                 ? 'Ready'
                 : 'Watching',
     }
@@ -888,18 +890,8 @@ export default function Home() {
 
   const handleCollect = useCallback(() => {
     if (sessionState !== 'running' || collectedMultiplier !== null) return
-    setCollectedMultiplier(currentMultiplier)
+      setCollectedMultiplier(currentMultiplier)
   }, [collectedMultiplier, currentMultiplier, sessionState])
-
-  useEffect(() => {
-    if (sessionState === 'running') {
-      setBeamAnimation(false)
-      const timeout = setTimeout(() => setBeamAnimation(true), 180)
-      return () => clearTimeout(timeout)
-    }
-
-    setBeamAnimation(false)
-  }, [sessionState])
 
   useEffect(() => {
     if (sessionState === 'running') {
@@ -1031,15 +1023,6 @@ export default function Home() {
     }
   }, [sessionState])
 
-  const beamStyle = useMemo(
-    () => ({
-      opacity: beamAnimation ? 1 : 0,
-      transform: `rotate(-57deg) scaleY(${beamAnimation ? 1 : 0})`,
-      transformOrigin: 'bottom left',
-    }),
-    [beamAnimation]
-  )
-
   // Multiplier always uses the glowing style
   const multiplierClasses = 'glow-number'
 
@@ -1088,7 +1071,7 @@ export default function Home() {
       ? `Collected at ${collectedMultiplier.toFixed(2)}x`
       : sessionState === 'running'
         ? `Collect ${currentMultiplier.toFixed(2)}x`
-        : 'Collect'
+          : 'Collect'
   const collectDisabled: boolean = 
     sessionState !== 'running' || 
     collectedMultiplier !== null ||
@@ -1237,7 +1220,7 @@ export default function Home() {
                               <div className="w-full h-full flex items-center justify-center p-2">
                                 {isPlaying && activeGiftAnimation ? (
                                   <GiftAnimationPlayer
-                                    animationData={animationData}
+                                  animationData={animationData}
                                     playKey={activeGiftAnimation.key}
                                     className="w-full h-full object-contain"
                                     onComplete={handleGiftAnimationComplete}
@@ -1248,7 +1231,7 @@ export default function Home() {
                                     giftId={gift.id}
                                     className="w-full h-full object-contain"
                                     alt={gift.name || 'Gift'}
-                                  />
+                                />
                                 )}
                               </div>
                             ) : gift.image_url ? (
@@ -1369,15 +1352,6 @@ export default function Home() {
             <section className="relative mt-6 flex flex-1 flex-col items-center justify-center">
               <div className={`relative flex h-[360px] w-full max-w-xs flex-col items-center justify-center overflow-hidden rounded-[32px] border border-white/10 px-7 py-8 shadow-[0_25px_60px_-20px_rgba(56,97,255,0.6)] backdrop-blur-[32px] transition-colors duration-700 ${gameAreaBackgroundClass}`}>
                 <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(255,255,255,0.12),transparent_65%)]" />
-
-                {/* Beam */}
-                <div
-                  className="absolute left-[62%] top-[78%] flex h-[420px] w-[6px] -translate-x-1/2 -translate-y-full items-start justify-center transition-all duration-700"
-                  style={beamStyle}
-                >
-                  <div className="h-full w-full rounded-full bg-gradient-to-b from-[#5BB6FF] via-[#3D7BFF] to-transparent blur-[1px]" />
-                  <div className="absolute h-full w-[8px] rounded-full bg-gradient-to-b from-[#5BB6FF] via-[#3D7BFF] to-transparent opacity-60 blur-[12px]" />
-                </div>
 
                 {/* Rocket */}
                 <div className="relative z-20 flex flex-col items-center justify-center">
@@ -1563,7 +1537,7 @@ export default function Home() {
                 </div>
                 
                 {loadingInventory ? (
-                  <div className="flex gap-3 overflow-x-auto pb-2 scrollbar-hide">
+                <div className="flex gap-3 overflow-x-auto pb-2 scrollbar-hide">
                     {[...Array(4)].map((_, idx) => (
                       <div
                         // eslint-disable-next-line react/no-array-index-key
@@ -1621,9 +1595,9 @@ export default function Home() {
                                 className="w-full h-full object-contain"
                               />
                             ) : (
-                              <span className="text-2xl">🎁</span>
+                    <span className="text-2xl">🎁</span>
                             )}
-                          </div>
+                  </div>
                         </button>
                       )
                     })}

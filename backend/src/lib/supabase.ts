@@ -15,9 +15,9 @@ if (!supabaseAnonKey && !supabaseServiceKey) {
 const supabaseKey = supabaseServiceKey ?? supabaseAnonKey!
 
 export const supabase = createClient(supabaseUrl, supabaseKey, {
-  auth: {
-    persistSession: false, // We're using server-side, no session persistence needed
-  },
+    auth: {
+      persistSession: false, // We're using server-side, no session persistence needed
+    },
 })
 
 // Database types (matching Supabase schema)

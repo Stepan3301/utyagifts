@@ -30,7 +30,7 @@ export const giftProcessingController = {
       }
 
       // Process the gift URL to extract animation data
-      const processedData = await giftProcessingService.processGiftUrl(giftUrl);
+      const processedData = await giftProcessingService.processGiftUrl(giftUrl, { giftId });
 
       res.json({
         success: true,
