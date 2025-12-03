@@ -171,8 +171,8 @@ const FAKE_USERNAMES = [
   'VantaRay',
   'ZenPulse',
 ]
-const MIN_BOT_COUNT = 5
-const MAX_BOT_COUNT = 30
+const MIN_BOT_COUNT = 3
+const MAX_BOT_COUNT = 12
 
 type SessionState = 'idle' | 'countdown' | 'running' | 'crashed'
 
@@ -1080,22 +1080,23 @@ export default function Home() {
 
       const elapsedSeconds = (timestamp - sessionStartTimeRef.current) / 1000
       
-      // Slow growth from 1x to 2x (takes ~7.5 seconds - twice as long)
-      // After 2x, growth accelerates faster and faster
+      // Total time to reach 20x: 30 seconds
+      // Phase 1: 1x to 2x (takes 5 seconds)
+      // Phase 2: 2x to 20x (takes 25 seconds, slower growth)
       let next: number
-      if (elapsedSeconds < 7.5) {
-        // Phase 1: Slow growth from 1x to 2x
-        // Using easing: 2 = 1 * rate^7.5, so rate = 2^(1/7.5) ≈ 1.094
-        const slowRate = Math.pow(2, 1 / 7.5)
-        next = parseFloat((1 * Math.pow(slowRate, elapsedSeconds)).toFixed(2))
+      const PHASE1_DURATION = 5 // seconds to reach 2x
+      
+      if (elapsedSeconds < PHASE1_DURATION) {
+        // Phase 1: Slow growth from 1x to 2x in 5 seconds
+        // Using exponential: 2 = 1 * rate^5, so rate = 2^(1/5) ≈ 1.1487
+        const phase1Rate = Math.pow(2, 1 / PHASE1_DURATION)
+        next = parseFloat((1 * Math.pow(phase1Rate, elapsedSeconds)).toFixed(2))
       } else {
-        // Phase 2: Accelerating growth after 2x
-        // Calculate how much time has passed since reaching 2x
-        const timeAfter2x = elapsedSeconds - 7.5
-        // Use accelerating rate: exponential increase for "faster and faster" effect
-        // Base rate starts at 1.35 and increases exponentially with time
-        const acceleratingRate = 1.35 * Math.pow(1.15, timeAfter2x) // Rate increases exponentially
-        next = parseFloat((2 * Math.pow(acceleratingRate, timeAfter2x)).toFixed(2))
+        // Phase 2: Slower growth from 2x to 20x in 25 seconds
+        // We need: 20 = 2 * rate^25, so rate = 10^(1/25) ≈ 1.0965
+        const timeAfter2x = elapsedSeconds - PHASE1_DURATION
+        const phase2Rate = Math.pow(10, 1 / 25) // Rate to go from 2x to 20x in 25 seconds
+        next = parseFloat((2 * Math.pow(phase2Rate, timeAfter2x)).toFixed(2))
       }
 
       const targetCrash = targetCrashMultiplier ?? crashTargetRef.current
@@ -1556,8 +1557,14 @@ export default function Home() {
 
               {/* Player list - only show on game tab */}
               {activeTab === 'game' && (
-                <section className="mt-6 space-y-4 w-full">
-                  {players.map((player) => (
+                <section className="mt-6 w-full">
+                  <div className="mb-4 text-center">
+                    <p className="text-sm font-medium text-white/80">
+                      {activePlayerCount} {activePlayerCount === 1 ? 'player' : 'players'} in session
+                    </p>
+                  </div>
+                  <div className="space-y-4">
+                    {players.map((player) => (
                     <div
                       key={player.id}
                       className={`flex items-center justify-between rounded-2xl border border-white/10 ${player.bgColor} px-6 py-5 text-sm font-medium text-white/90 shadow-[0_15px_35px_-15px_rgba(41,88,255,0.6)] backdrop-blur-lg w-full`}
@@ -1579,6 +1586,7 @@ export default function Home() {
                       </div>
                     </div>
                   ))}
+                  </div>
                 </section>
               )}
             </section>
