@@ -185,7 +185,8 @@ interface BotPlayer {
   status: 'countdown' | 'flying' | 'cashed' | 'crashed'
   cashedAt?: number
   result?: 'won' | 'lost'
-  willCollectAt?: number // Random multiplier when bot will decide to collect (optional, can collect anytime)
+  willCollectAt?: number // Preferred multiplier when bot will decide to collect
+  greediness: number // 0-1, higher = more greedy, waits longer, more likely to crash
 }
 
 const parseAnimationData = (raw: unknown, giftId: string): any | null => {
@@ -345,8 +346,15 @@ const generateBotPlayers = (crashPoint: number): BotPlayer[] => {
   const minSafePoint = Math.max(1.0, parseFloat((maxSafePoint - 0.35).toFixed(2)))
 
   return Array.from({ length: botCount }).map((_, index) => {
-    // Some bots will have a preferred collection point, but they can collect anytime
-    const willCollectAt = Math.random() < 0.7 ? getRandomBetween(minSafePoint, maxSafePoint, 2) : undefined
+    // Greediness: 0 = conservative (collects early), 1 = greedy (waits long, risks crash)
+    const greediness = Math.random()
+    // Greedy bots prefer higher multipliers, conservative bots prefer lower
+    const preferredMultiplier = minSafePoint + (maxSafePoint - minSafePoint) * greediness
+    const willCollectAt = getRandomBetween(
+      Math.max(minSafePoint, preferredMultiplier - 0.5),
+      Math.min(maxSafePoint, preferredMultiplier + 0.5),
+      2
+    )
     const avatar = avatarPool[index % avatarPool.length]
     const baseName = namesPool[index % namesPool.length] ?? `Bot ${index + 1}`
     const usernameHandle = usernamesPool[index % usernamesPool.length] ?? `@bot${index + 1}`
@@ -359,6 +367,7 @@ const generateBotPlayers = (crashPoint: number): BotPlayer[] => {
       betTon: getRandomBetween(0.2, 25, 2),
       status: 'countdown' as const,
       willCollectAt,
+      greediness,
     }
   })
 }
@@ -978,19 +987,47 @@ export default function Home() {
 
   useEffect(() => {
     if (sessionState === 'running') {
+      const targetCrash = targetCrashMultiplier ?? crashTargetRef.current
+      const distanceToCrash = targetCrash - currentMultiplier
+      const progressToCrash = Math.max(0, Math.min(1, (currentMultiplier - 1) / (targetCrash - 1)))
+      
       setBotPlayers((prev) =>
         prev.map((bot) => {
           if (bot.status === 'cashed' || bot.status === 'crashed') {
             return bot
           }
 
-          // Bots can collect at any time - random chance each update
-          // Higher chance if they have a willCollectAt point and we're near it
-          let collectChance = 0.02 // 2% base chance per update
+          // Calculate collection chance based on bot's greediness and current situation
+          let collectChance = 0.01 // 1% base chance per update
           
-          if (bot.willCollectAt && currentMultiplier >= bot.willCollectAt * 0.8) {
-            // Increase chance when near preferred point
-            collectChance = 0.15
+          if (bot.willCollectAt) {
+            const distanceToPreferred = Math.abs(currentMultiplier - bot.willCollectAt)
+            const nearPreferred = distanceToPreferred < 0.3
+            
+            if (nearPreferred) {
+              // High chance when at preferred multiplier
+              collectChance = 0.25
+            } else if (currentMultiplier >= bot.willCollectAt) {
+              // Past preferred point - chance increases with greediness
+              collectChance = 0.05 + (bot.greediness * 0.1)
+            } else {
+              // Before preferred point - lower chance, but increases as we approach
+              const approachFactor = Math.max(0, 1 - distanceToPreferred / 2)
+              collectChance = 0.01 + (approachFactor * 0.05)
+            }
+          }
+          
+          // As we get closer to crash, conservative bots collect more, greedy bots less
+          if (distanceToCrash < 0.5) {
+            // Very close to crash - conservative bots panic, greedy bots hold
+            if (bot.greediness < 0.5) {
+              collectChance = 0.4 // Conservative bots collect
+            } else {
+              collectChance = Math.max(0.01, collectChance * 0.3) // Greedy bots hold
+            }
+          } else if (distanceToCrash < 1.0) {
+            // Close to crash
+            collectChance = collectChance * (1 - bot.greediness * 0.5)
           }
           
           // Randomly decide to collect
@@ -1016,7 +1053,7 @@ export default function Home() {
         ),
       )
     }
-  }, [currentMultiplier, sessionState])
+  }, [currentMultiplier, sessionState, targetCrashMultiplier])
 
   const sessionStartTimeRef = useRef<number>(0)
   const isRunningRef = useRef<boolean>(false)
