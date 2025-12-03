@@ -740,7 +740,7 @@ export default function Home() {
   }, [collectedMultiplier, sessionState])
 
   const displayedMultiplier = useMemo(() => {
-    if (sessionState === 'idle') {
+    if (sessionState === 'idle' || sessionState === 'countdown') {
       return '1.00x'
     }
 
@@ -782,23 +782,43 @@ export default function Home() {
   const defaultAvatar = PLAYER_AVATARS[0]
 
   const players = useMemo(() => {
-    const botEntries = botPlayers.map((bot) => ({
-      id: bot.id,
-      name: bot.name,
-      username: bot.username,
-      avatar: bot.avatar,
-      bet: `${bot.betTon.toFixed(2)} TON`,
-      amount: `${bot.cashOutPoint.toFixed(2)}x`,
-      icon: '🤖',
-      status:
-        bot.status === 'cashed'
-          ? `Won at ${bot.cashOutPoint.toFixed(2)}x`
-          : bot.status === 'crashed'
-            ? 'Lost'
-            : sessionState === 'countdown'
-              ? 'Ready'
-              : 'In flight',
-    }))
+    const botEntries = botPlayers.map((bot) => {
+      let bgColor = 'bg-white/10'
+      
+      if (bot.status === 'cashed') {
+        bgColor = 'bg-green-500/30'
+      } else if (bot.status === 'crashed') {
+        bgColor = 'bg-red-500/30'
+      } else if (sessionState === 'running' && bot.status === 'flying') {
+        bgColor = 'bg-red-500/30'
+      }
+
+      return {
+        id: bot.id,
+        name: bot.name,
+        username: bot.username,
+        avatar: bot.avatar,
+        bet: `${bot.betTon.toFixed(2)} TON`,
+        amount: `${bot.cashOutPoint.toFixed(2)}x`,
+        icon: '🤖',
+        status:
+          bot.status === 'cashed'
+            ? `Won at ${bot.cashOutPoint.toFixed(2)}x`
+            : bot.status === 'crashed'
+              ? 'Lost'
+              : sessionState === 'countdown'
+                ? 'Ready'
+                : 'In flight',
+        bgColor,
+      }
+    })
+
+    let userBgColor = 'bg-white/10'
+    if (isUserInCurrentSession && sessionState === 'running') {
+      userBgColor = collectedMultiplier !== null ? 'bg-green-500/30' : 'bg-red-500/30'
+    } else if (sessionState === 'crashed' && isUserInCurrentSession && collectedMultiplier === null) {
+      userBgColor = 'bg-red-500/30'
+    }
 
     const youEntry = {
       id: 'you',
@@ -824,6 +844,7 @@ export default function Home() {
                 : sessionState === 'countdown'
                 ? 'Ready'
                 : 'Watching',
+      bgColor: userBgColor,
     }
 
     return [...botEntries, youEntry]
@@ -846,16 +867,21 @@ export default function Home() {
   )
 
   const playerChips = useMemo(() => {
-    return botPlayers.map((bot) => {
+    const botChips = botPlayers.map((bot) => {
       let tone = 'text-white/60'
       let statusLabel = `Target ${bot.cashOutPoint.toFixed(2)}x`
+      let bgColor = 'bg-white/5'
 
       if (bot.status === 'cashed') {
         tone = 'text-green-400'
         statusLabel = `Won @ ${bot.cashOutPoint.toFixed(2)}x`
+        bgColor = 'bg-green-500/30'
       } else if (bot.status === 'crashed') {
         tone = 'text-red-400'
         statusLabel = 'Lost this round'
+        bgColor = 'bg-red-500/30'
+      } else if (sessionState === 'running' && bot.status === 'flying') {
+        bgColor = 'bg-red-500/30'
       }
 
       return {
@@ -865,9 +891,28 @@ export default function Home() {
         bet: `${bot.betTon.toFixed(2)} TON`,
         tone,
         statusLabel,
+        bgColor,
       }
     })
-  }, [botPlayers])
+
+    // Add user chip if they're in the session
+    if (isUserInCurrentSession && sessionState === 'running') {
+      const userChip = {
+        id: 'you',
+        avatar: telegramUser?.photo_url ?? botPlayers[0]?.avatar ?? defaultAvatar,
+        username: telegramUser?.username ? `@${telegramUser.username}` : '@you',
+        bet: '1.00 TON',
+        tone: collectedMultiplier !== null ? 'text-green-400' : 'text-white/60',
+        statusLabel: collectedMultiplier !== null 
+          ? `Collected @ ${collectedMultiplier.toFixed(2)}x`
+          : `Target ${currentMultiplier.toFixed(2)}x`,
+        bgColor: collectedMultiplier !== null ? 'bg-green-500/30' : 'bg-red-500/30',
+      }
+      return [...botChips, userChip]
+    }
+
+    return botChips
+  }, [botPlayers, isUserInCurrentSession, sessionState, collectedMultiplier, currentMultiplier, telegramUser, defaultAvatar])
 
   const queueNextSession = useCallback(() => {
     if (sessionState !== 'countdown' || isQueuedForNextSession) {
@@ -1474,7 +1519,7 @@ export default function Home() {
                     {playerChips.map((chip) => (
                       <div
                         key={chip.id}
-                        className="flex-shrink-0 flex items-center gap-2 rounded-2xl border border-white/10 bg-white/5 px-3 py-2 backdrop-blur-md min-w-[150px]"
+                        className={`flex-shrink-0 flex items-center gap-2 rounded-2xl border border-white/10 ${chip.bgColor} px-3 py-2 backdrop-blur-md min-w-[150px]`}
                       >
                         <img
                           src={chip.avatar}
@@ -1521,7 +1566,7 @@ export default function Home() {
                   {players.map((player) => (
                     <div
                       key={player.id}
-                      className="flex items-center justify-between rounded-2xl border border-white/10 bg-white/10 px-4 py-3 text-sm font-medium text-white/90 shadow-[0_15px_35px_-15px_rgba(41,88,255,0.6)] backdrop-blur-lg"
+                      className={`flex items-center justify-between rounded-2xl border border-white/10 ${player.bgColor} px-4 py-3 text-sm font-medium text-white/90 shadow-[0_15px_35px_-15px_rgba(41,88,255,0.6)] backdrop-blur-lg`}
                     >
                       <div className="flex items-center gap-3">
                         <img
