@@ -499,6 +499,8 @@ export default function Home() {
   const [loadingInventory, setLoadingInventory] = useState(false)
   const [countdown, setCountdown] = useState(0)
   const [selectedGiftId, setSelectedGiftId] = useState<string | null>(null)
+  const [selectedGiftIds, setSelectedGiftIds] = useState<string[]>([])
+  const [showGiftSelectionModal, setShowGiftSelectionModal] = useState(false)
   const [isQueuedForNextSession, setIsQueuedForNextSession] = useState(false)
   const [isUserInCurrentSession, setIsUserInCurrentSession] = useState(false)
   const [activeGiftAnimation, setActiveGiftAnimation] = useState<{ id: string; key: number } | null>(null)
@@ -919,16 +921,41 @@ export default function Home() {
       return
     }
 
-    if (!selectedGiftId) {
-      if (inventory.length > 0) {
-        setSelectedGiftId(inventory[0].id)
-      }
-      alert('Please select a gift from your inventory first')
+    if (inventory.length === 0) {
+      alert('You need at least one gift in your inventory to join a session')
       return
     }
 
+    // Open modal for gift selection
+    setShowGiftSelectionModal(true)
+    setSelectedGiftIds([])
+  }, [inventory, isQueuedForNextSession, sessionState])
+
+  const handleGiftSelectionContinue = useCallback(() => {
+    if (selectedGiftIds.length === 0) {
+      alert('Please select at least one gift')
+      return
+    }
+
+    setShowGiftSelectionModal(false)
     setIsQueuedForNextSession(true)
-  }, [inventory, isQueuedForNextSession, selectedGiftId, sessionState])
+    // Use first selected gift for backward compatibility (if needed elsewhere)
+    setSelectedGiftId(selectedGiftIds[0])
+  }, [selectedGiftIds])
+
+  const handleGiftSelectionCancel = useCallback(() => {
+    setShowGiftSelectionModal(false)
+    setSelectedGiftIds([])
+  }, [])
+
+  const toggleGiftSelection = useCallback((giftId: string) => {
+    setSelectedGiftIds((prev) => {
+      if (prev.includes(giftId)) {
+        return prev.filter((id) => id !== giftId)
+      }
+      return [...prev, giftId]
+    })
+  }, [])
 
   const cancelQueuedSession = useCallback(() => {
     setIsQueuedForNextSession(false)
@@ -1446,97 +1473,6 @@ export default function Home() {
               </div>
               <div className="mt-6 text-center text-sm font-medium text-white/80">{sessionMessage}</div>
 
-              {/* Gift Selection - show whenever we're waiting to start */}
-              {sessionState !== 'running' && inventory.length > 0 && (
-                <section className="mt-4 w-full">
-                  <p className="mb-2 text-xs text-white/60 text-center">Select a gift to launch with:</p>
-                  <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide">
-                    {inventory.slice(0, 5).map((gift) => {
-                      const animationData = parseAnimationData(gift.animation_data, gift.id)
-                      const isPlaying = activeGiftAnimation?.id === gift.id
-                      return (
-                      <button
-                        key={gift.id}
-                        onClick={() => {
-                          setSelectedGiftId(gift.id)
-                          if (animationData) {
-                            triggerGiftAnimation(gift.id)
-                          }
-                        }}
-                        className={`flex-shrink-0 rounded-xl border-2 p-2 transition-all ${
-                          selectedGiftId === gift.id
-                            ? 'border-blue-400 bg-blue-400/20'
-                            : 'border-white/10 bg-white/5 hover:border-white/20'
-                        }`}
-                      >
-                        <div className="h-12 w-12 flex items-center justify-center">
-                            {animationData ? (
-                            isPlaying && activeGiftAnimation ? (
-                              <GiftAnimationPlayer
-                                animationData={animationData}
-                                playKey={activeGiftAnimation.key}
-                                className="w-12 h-12 object-contain"
-                                onComplete={handleGiftAnimationComplete}
-                              />
-                            ) : (
-                              <LottieFirstFrame
-                                animationData={animationData}
-                                giftId={gift.id}
-                                className="w-12 h-12 object-contain"
-                                alt={gift.name || 'Gift'}
-                              />
-                            )
-                          ) : gift.image_url ? (
-                            <img
-                              src={gift.image_url}
-                              alt={gift.name || 'Gift'}
-                              className="w-12 h-12 object-contain rounded-lg"
-                            />
-                          ) : (
-                            <span className="text-2xl">🎁</span>
-                          )}
-                        </div>
-                        {gift.name && (
-                          <p className="mt-1 text-xs text-white/80 truncate max-w-[60px]">
-                            {gift.name}
-                          </p>
-                        )}
-                      </button>
-                      )
-                    })}
-                  </div>
-                </section>
-              )}
-
-              {/* Live players under rocket */}
-              {playerChips.length > 0 && (
-                <section className="mt-4 w-full">
-                  <div className="flex items-center justify-between text-xs text-white/60 mb-2">
-                    <span>{activePlayerCount} players in session</span>
-                    <span>Live bets</span>
-                  </div>
-                  <div className="flex gap-3 overflow-x-auto pb-2 scrollbar-hide">
-                    {playerChips.map((chip) => (
-                      <div
-                        key={chip.id}
-                        className={`flex-shrink-0 flex items-center gap-2 rounded-2xl border border-white/10 ${chip.bgColor} px-3 py-2 backdrop-blur-md min-w-[150px]`}
-                      >
-                        <img
-                          src={chip.avatar}
-                          alt={chip.username}
-                          className="h-10 w-10 rounded-full object-cover border border-white/20"
-                        />
-                        <div className="text-xs">
-                          <p className="font-semibold text-white truncate max-w-[90px]">{chip.username}</p>
-                          <p className="text-white/70">{chip.bet}</p>
-                          <p className={`text-[11px] ${chip.tone}`}>{chip.statusLabel}</p>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </section>
-              )}
-
               {/* Actions - moved below game frame */}
               <section className="mt-6 flex gap-3">
                 <button
@@ -1591,57 +1527,45 @@ export default function Home() {
           </>
         )}
 
-        {/* Inventory Block - shown on game tab */}
-        {activeTab === 'game' && (
-          <section className="mt-6 w-full">
-            <div className="relative rounded-[24px] border border-white/10 bg-white/5 px-5 py-4 shadow-[0_15px_35px_-15px_rgba(41,88,255,0.4)] backdrop-blur-xl">
-              <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(255,255,255,0.08),transparent_65%)]" />
+      </div>
+
+      {/* Gift Selection Modal */}
+      {showGiftSelectionModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm">
+          <div className="relative mx-4 w-full max-w-md rounded-[32px] border border-white/10 bg-gradient-to-b from-[#050015] via-[#09002F] to-[#01010A] p-6 shadow-[0_25px_60px_-20px_rgba(56,97,255,0.6)] backdrop-blur-[32px]">
+            <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(255,255,255,0.12),transparent_65%)]" />
+            
+            <div className="relative z-10">
+              <h2 className="mb-4 text-2xl font-bold text-white">Select Gifts</h2>
+              <p className="mb-4 text-sm text-white/70">Choose one or more gifts to bet with</p>
               
-              <div className="relative z-10">
-                <div className="flex items-center justify-between mb-3">
-                  <h3 className="text-lg font-semibold text-white flex items-center gap-2">
-                    <span>🎒</span>
-                    Inventory
-                  </h3>
-                  <span className="text-xs text-white/50">{inventoryCountLabel}</span>
+              {loadingInventory ? (
+                <div className="flex items-center justify-center py-12">
+                  <div className="h-12 w-12 animate-spin rounded-full border-4 border-purple-500/30 border-t-purple-400"></div>
                 </div>
-                
-                {loadingInventory ? (
-                <div className="flex gap-3 overflow-x-auto pb-2 scrollbar-hide">
-                    {[...Array(4)].map((_, idx) => (
-                      <div
-                        // eslint-disable-next-line react/no-array-index-key
-                        key={idx}
-                        className="flex-shrink-0 w-20 h-20 rounded-xl border border-white/10 bg-white/10 animate-pulse"
-                      />
-                    ))}
-                  </div>
-                ) : inventory.length === 0 ? (
-                  <div className="text-center py-4">
-                    <p className="text-sm text-white/60">No gifts yet</p>
-                    <p className="text-xs text-white/40">Play sessions to earn your first gift</p>
-                  </div>
-                ) : (
-                  <div className="flex gap-3 overflow-x-auto pb-2 scrollbar-hide">
+              ) : inventory.length === 0 ? (
+                <div className="py-12 text-center">
+                  <p className="text-white/70">No gifts in inventory</p>
+                </div>
+              ) : (
+                <div className="mb-6 max-h-[400px] overflow-y-auto">
+                  <div className="grid grid-cols-3 gap-3">
                     {inventory.map((gift) => {
                       const animationData = parseAnimationData(gift.animation_data, gift.id)
-                      const isSelected = selectedGiftId === gift.id
+                      const isSelected = selectedGiftIds.includes(gift.id)
                       const isPlaying = activeGiftAnimation?.id === gift.id
                       return (
                         <button
                           key={gift.id}
                           type="button"
-                          onClick={() => {
-                            setSelectedGiftId(gift.id)
-                            if (animationData) {
-                              triggerGiftAnimation(gift.id)
-                            }
-                          }}
-                          className={`flex-shrink-0 w-20 h-20 rounded-xl border p-2 transition-all ${
-                            isSelected ? 'border-blue-400 bg-blue-400/20' : 'border-white/10 bg-white/5 hover:border-white/20'
+                          onClick={() => toggleGiftSelection(gift.id)}
+                          className={`relative rounded-xl border-2 p-2 transition-all ${
+                            isSelected
+                              ? 'border-blue-400 bg-blue-400/20 shadow-lg shadow-blue-400/30'
+                              : 'border-white/10 bg-white/5 hover:border-white/20'
                           }`}
                         >
-                          <div className="w-full h-full flex items-center justify-center">
+                          <div className="aspect-square flex items-center justify-center">
                             {animationData ? (
                               isPlaying && activeGiftAnimation ? (
                                 <GiftAnimationPlayer
@@ -1665,23 +1589,47 @@ export default function Home() {
                                 className="w-full h-full object-contain"
                               />
                             ) : (
-                    <span className="text-2xl">🎁</span>
+                              <span className="text-3xl">🎁</span>
                             )}
-                  </div>
+                          </div>
+                          {isSelected && (
+                            <div className="absolute -top-1 -right-1 flex h-6 w-6 items-center justify-center rounded-full bg-blue-400 text-xs font-bold text-white">
+                              ✓
+                            </div>
+                          )}
+                          {gift.name && (
+                            <p className="mt-1 text-xs text-white/80 truncate text-center">
+                              {gift.name}
+                            </p>
+                          )}
                         </button>
                       )
                     })}
                   </div>
-                )}
-                
-                <p className="text-xs text-white/40 mt-3 text-center">
-                  Tap a gift to prepare it for the next launch
-                </p>
+                </div>
+              )}
+              
+              <div className="flex gap-3">
+                <button
+                  type="button"
+                  onClick={handleGiftSelectionCancel}
+                  className="btn flex-1 py-3 text-base font-bold bg-white/10 hover:bg-white/20"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={handleGiftSelectionContinue}
+                  disabled={selectedGiftIds.length === 0}
+                  className="btn flex-1 py-3 text-base font-bold disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:transform-none"
+                >
+                  Continue ({selectedGiftIds.length})
+                </button>
               </div>
+            </div>
+          </div>
         </div>
-          </section>
-        )}
-      </div>
+      )}
 
       {/* Bottom Navigation */}
       <nav ref={navRef} className="neo-nav" role="navigation" aria-label="Main navigation">
