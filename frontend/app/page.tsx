@@ -182,10 +182,10 @@ interface BotPlayer {
   username: string
   avatar: string
   betTon: number
-  cashOutPoint: number
   status: 'countdown' | 'flying' | 'cashed' | 'crashed'
   cashedAt?: number
   result?: 'won' | 'lost'
+  willCollectAt?: number // Random multiplier when bot will decide to collect (optional, can collect anytime)
 }
 
 const parseAnimationData = (raw: unknown, giftId: string): any | null => {
@@ -345,9 +345,8 @@ const generateBotPlayers = (crashPoint: number): BotPlayer[] => {
   const minSafePoint = Math.max(1.0, parseFloat((maxSafePoint - 0.35).toFixed(2)))
 
   return Array.from({ length: botCount }).map((_, index) => {
-    const span = Math.max(0.01, maxSafePoint - minSafePoint)
-    const rawPoint = minSafePoint + Math.random() * span
-    const cashOutPoint = parseFloat(Math.max(1.0, Math.min(rawPoint, maxSafePoint)).toFixed(2))
+    // Some bots will have a preferred collection point, but they can collect anytime
+    const willCollectAt = Math.random() < 0.7 ? getRandomBetween(minSafePoint, maxSafePoint, 2) : undefined
     const avatar = avatarPool[index % avatarPool.length]
     const baseName = namesPool[index % namesPool.length] ?? `Bot ${index + 1}`
     const usernameHandle = usernamesPool[index % usernamesPool.length] ?? `@bot${index + 1}`
@@ -358,8 +357,8 @@ const generateBotPlayers = (crashPoint: number): BotPlayer[] => {
       username: usernameHandle.startsWith('@') ? usernameHandle : `@${usernameHandle}`,
       avatar,
       betTon: getRandomBetween(0.2, 25, 2),
-      cashOutPoint,
       status: 'countdown' as const,
+      willCollectAt,
     }
   })
 }
@@ -562,11 +561,12 @@ export default function Home() {
     crashTargetRef.current = crashPoint
     countdownEndsAtRef.current = Date.now() + durationSeconds * 1000
     setTargetCrashMultiplier(crashPoint)
-              setSessionState('countdown')
+    setSessionState('countdown')
     setCountdown(durationSeconds)
-        setCurrentMultiplier(1)
-              setCollectedMultiplier(null)
+    setCurrentMultiplier(1)
+    setCollectedMultiplier(null)
     setIsUserInCurrentSession(false)
+    // Generate new bots for the next session
     setBotPlayers(generateBotPlayers(crashPoint))
   }, [])
 
@@ -787,12 +787,15 @@ export default function Home() {
     const botEntries = botPlayers.map((bot) => {
       let bgColor = 'bg-white/10'
       
+      // During running: normal background if not collected
+      // After collection: green
+      // After crash if didn't collect: red
       if (bot.status === 'cashed') {
         bgColor = 'bg-green-500/30'
       } else if (bot.status === 'crashed') {
         bgColor = 'bg-red-500/30'
       } else if (sessionState === 'running' && bot.status === 'flying') {
-        bgColor = 'bg-red-500/30'
+        bgColor = 'bg-white/10' // Normal during running
       }
 
       return {
@@ -801,13 +804,17 @@ export default function Home() {
         username: bot.username,
         avatar: bot.avatar,
         bet: `${bot.betTon.toFixed(2)} TON`,
-        amount: `${bot.cashOutPoint.toFixed(2)}x`,
+        amount: bot.status === 'cashed' && bot.cashedAt
+          ? `${bot.cashedAt.toFixed(2)}x`
+          : sessionState === 'running'
+            ? `${currentMultiplier.toFixed(2)}x`
+            : '—',
         icon: '🤖',
         status:
           bot.status === 'cashed'
-            ? `Won at ${bot.cashOutPoint.toFixed(2)}x`
+            ? `Collected at ${bot.cashedAt?.toFixed(2) ?? '0.00'}x`
             : bot.status === 'crashed'
-              ? 'Lost'
+              ? 'Crashed'
               : sessionState === 'countdown'
                 ? 'Ready'
                 : 'In flight',
@@ -816,10 +823,12 @@ export default function Home() {
     })
 
     let userBgColor = 'bg-white/10'
-    if (isUserInCurrentSession && sessionState === 'running') {
+    // During running: normal if not collected, green if collected
+    // After crash: red if didn't collect, green if collected
+    if (sessionState === 'running' && isUserInCurrentSession) {
+      userBgColor = collectedMultiplier !== null ? 'bg-green-500/30' : 'bg-white/10'
+    } else if (sessionState === 'crashed' && isUserInCurrentSession) {
       userBgColor = collectedMultiplier !== null ? 'bg-green-500/30' : 'bg-red-500/30'
-    } else if (sessionState === 'crashed' && isUserInCurrentSession && collectedMultiplier === null) {
-      userBgColor = 'bg-red-500/30'
     }
 
     const youEntry = {
@@ -841,8 +850,8 @@ export default function Home() {
               ? 'Live'
           : collectedMultiplier !== null
             ? `Collected ${collectedMultiplier.toFixed(2)}x`
-                : sessionState === 'crashed'
-              ? 'Missed'
+                : sessionState === 'crashed' && isUserInCurrentSession
+              ? 'Crashed'
                 : sessionState === 'countdown'
                 ? 'Ready'
                 : 'Watching',
@@ -871,19 +880,20 @@ export default function Home() {
   const playerChips = useMemo(() => {
     const botChips = botPlayers.map((bot) => {
       let tone = 'text-white/60'
-      let statusLabel = `Target ${bot.cashOutPoint.toFixed(2)}x`
+      let statusLabel = sessionState === 'running' ? `${currentMultiplier.toFixed(2)}x` : 'Ready'
       let bgColor = 'bg-white/5'
 
       if (bot.status === 'cashed') {
         tone = 'text-green-400'
-        statusLabel = `Won @ ${bot.cashOutPoint.toFixed(2)}x`
+        statusLabel = `Collected @ ${bot.cashedAt?.toFixed(2) ?? '0.00'}x`
         bgColor = 'bg-green-500/30'
       } else if (bot.status === 'crashed') {
         tone = 'text-red-400'
-        statusLabel = 'Lost this round'
+        statusLabel = 'Crashed'
         bgColor = 'bg-red-500/30'
       } else if (sessionState === 'running' && bot.status === 'flying') {
-        bgColor = 'bg-red-500/30'
+        bgColor = 'bg-white/5' // Normal during running
+        statusLabel = `${currentMultiplier.toFixed(2)}x`
       }
 
       return {
@@ -907,8 +917,8 @@ export default function Home() {
         tone: collectedMultiplier !== null ? 'text-green-400' : 'text-white/60',
         statusLabel: collectedMultiplier !== null 
           ? `Collected @ ${collectedMultiplier.toFixed(2)}x`
-          : `Target ${currentMultiplier.toFixed(2)}x`,
-        bgColor: collectedMultiplier !== null ? 'bg-green-500/30' : 'bg-red-500/30',
+          : `${currentMultiplier.toFixed(2)}x`,
+        bgColor: collectedMultiplier !== null ? 'bg-green-500/30' : 'bg-white/5',
       }
       return [...botChips, userChip]
     }
@@ -974,11 +984,21 @@ export default function Home() {
             return bot
           }
 
-          if (currentMultiplier >= bot.cashOutPoint) {
+          // Bots can collect at any time - random chance each update
+          // Higher chance if they have a willCollectAt point and we're near it
+          let collectChance = 0.02 // 2% base chance per update
+          
+          if (bot.willCollectAt && currentMultiplier >= bot.willCollectAt * 0.8) {
+            // Increase chance when near preferred point
+            collectChance = 0.15
+          }
+          
+          // Randomly decide to collect
+          if (Math.random() < collectChance) {
             return {
               ...bot,
               status: 'cashed',
-              cashedAt: bot.cashOutPoint,
+              cashedAt: currentMultiplier,
               result: 'won',
             }
           }
@@ -987,11 +1007,12 @@ export default function Home() {
         }),
       )
     } else if (sessionState === 'countdown') {
+      // Keep crashed and cashed status during countdown - only reset flying bots
       setBotPlayers((prev) =>
         prev.map((bot) =>
-          bot.status === 'cashed'
+          bot.status === 'crashed' || bot.status === 'cashed'
             ? bot
-            : { ...bot, status: 'countdown', result: undefined },
+            : { ...bot, status: 'countdown', result: undefined, cashedAt: undefined },
         ),
       )
     }
@@ -1498,26 +1519,26 @@ export default function Home() {
 
               {/* Player list - only show on game tab */}
               {activeTab === 'game' && (
-                <section className="mt-6 space-y-3">
+                <section className="mt-6 space-y-4 w-full">
                   {players.map((player) => (
                     <div
                       key={player.id}
-                      className={`flex items-center justify-between rounded-2xl border border-white/10 ${player.bgColor} px-4 py-3 text-sm font-medium text-white/90 shadow-[0_15px_35px_-15px_rgba(41,88,255,0.6)] backdrop-blur-lg`}
+                      className={`flex items-center justify-between rounded-2xl border border-white/10 ${player.bgColor} px-6 py-5 text-sm font-medium text-white/90 shadow-[0_15px_35px_-15px_rgba(41,88,255,0.6)] backdrop-blur-lg w-full`}
                     >
-                      <div className="flex items-center gap-3">
+                      <div className="flex items-center gap-4">
                         <img
                           src={player.avatar}
                           alt={player.name}
-                          className="h-11 w-11 rounded-xl object-cover border border-white/20"
+                          className="h-16 w-16 rounded-xl object-cover border border-white/20"
                         />
                         <div>
-                          <p className="text-base font-semibold">{player.name}</p>
-                          <p className="text-xs text-white/60">{player.status}</p>
+                          <p className="text-lg font-semibold">{player.name}</p>
+                          <p className="text-sm text-white/60 mt-1">{player.status}</p>
                         </div>
                       </div>
                       <div className="text-right">
-                        <p className="text-base font-semibold text-blue-100">{player.bet}</p>
-                        <p className="text-xs text-white/60">{player.amount}</p>
+                        <p className="text-lg font-semibold text-blue-100">{player.bet}</p>
+                        <p className="text-sm text-white/60 mt-1">{player.amount}</p>
                       </div>
                     </div>
                   ))}
