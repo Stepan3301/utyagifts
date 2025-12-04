@@ -468,6 +468,15 @@ function GiftAnimationPlayer({
   onComplete?: () => void
 }) {
   const animationRef = useRef<LottieRefCurrentProps>(null)
+  const hasCompletedRef = useRef(false)
+  const playKeyRef = useRef(playKey)
+  const cleanupRef = useRef<(() => void) | null>(null)
+
+  // Update playKey ref when it changes
+  useEffect(() => {
+    playKeyRef.current = playKey
+    hasCompletedRef.current = false
+  }, [playKey])
 
   useEffect(() => {
     if (!playKey || !animationRef.current) {
@@ -479,23 +488,88 @@ function GiftAnimationPlayer({
       addEventListener?: (event: string, cb: () => void) => void
       removeEventListener?: (event: string, cb: () => void) => void
     }
+    
     const handleComplete = () => {
-      onComplete?.()
+      // Only call onComplete if this is still the current playKey
+      if (playKeyRef.current === playKey && !hasCompletedRef.current) {
+        hasCompletedRef.current = true
+        onComplete?.()
+      }
     }
 
-    instance.goToAndStop(0, true)
-    instance.setSpeed?.(1)
-    instance.play()
-    eventTarget.addEventListener?.('complete', handleComplete)
+    // Reset and play animation
+    const playAnimation = () => {
+      if (!animationRef.current || playKeyRef.current !== playKey) {
+        return
+      }
+      
+      try {
+        const currentInstance = animationRef.current
+        // Reset to beginning
+        currentInstance.goToAndStop(0, true)
+        // Set normal speed
+        currentInstance.setSpeed?.(1)
+        // Play from beginning to end
+        currentInstance.playSegments?.([0, -1], true) || currentInstance.play()
+        eventTarget.addEventListener?.('complete', handleComplete)
+      } catch (error) {
+        console.warn('Error playing animation:', error)
+        // Fallback to regular play
+        try {
+          animationRef.current?.play()
+        } catch (e) {
+          console.warn('Fallback play also failed:', e)
+        }
+      }
+    }
 
-    return () => {
+    // Wait for animation to be loaded before playing
+    const tryPlay = () => {
+      if (animationRef.current) {
+        // Check if animation is ready by trying to get total frames
+        try {
+          const totalFrames = (animationRef.current as any).totalFrames
+          if (totalFrames && totalFrames > 0) {
+            playAnimation()
+          } else {
+            // Animation not ready yet, retry
+            setTimeout(tryPlay, 50)
+          }
+        } catch {
+          // If we can't check, just try to play
+          playAnimation()
+        }
+      } else {
+        // Retry if not ready yet
+        setTimeout(tryPlay, 50)
+      }
+    }
+
+    // Start trying to play after a short delay to ensure Lottie is initialized
+    const timeoutId = setTimeout(tryPlay, 150)
+
+    cleanupRef.current = () => {
+      clearTimeout(timeoutId)
+      // Only remove event listener, NEVER stop the animation
+      // Let it play to completion naturally
       eventTarget.removeEventListener?.('complete', handleComplete)
-      instance.stop()
     }
+
+    return cleanupRef.current
   }, [playKey, onComplete])
+
+  // Cleanup on unmount only
+  useEffect(() => {
+    return () => {
+      if (cleanupRef.current) {
+        cleanupRef.current()
+      }
+    }
+  }, [])
 
   return (
     <Lottie
+      key={`player-${playKey}`} // Force new instance when playKey changes
       lottieRef={animationRef}
       animationData={animationData}
       loop={false}
@@ -870,11 +944,14 @@ export default function Home() {
   }, [])
 
   const handlePlayerGiftAnimationComplete = useCallback((playerId: string) => {
-    setPlayingGiftAnimations((prev) => {
-      const newMap = new Map(prev)
-      newMap.delete(playerId)
-      return newMap
-    })
+    // Wait a bit before removing to ensure animation fully completes
+    setTimeout(() => {
+      setPlayingGiftAnimations((prev) => {
+        const newMap = new Map(prev)
+        newMap.delete(playerId)
+        return newMap
+      })
+    }, 100)
   }, [])
   const gradientOverlay = useMemo(
     () =>
