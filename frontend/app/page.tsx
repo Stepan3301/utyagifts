@@ -181,7 +181,8 @@ interface BotPlayer {
   name: string
   username: string
   avatar: string
-  betTon: number
+  giftAnimationData: any | null
+  giftFileName: string
   status: 'countdown' | 'flying' | 'cashed' | 'crashed'
   cashedAt?: number
   result?: 'won' | 'lost'
@@ -336,40 +337,48 @@ const extractFirstFrame = async (animationData: any, giftId: string, size = 256)
   }
 }
 
-const generateBotPlayers = (crashPoint: number): BotPlayer[] => {
+const generateBotPlayers = async (crashPoint: number): Promise<BotPlayer[]> => {
   const botCount = Math.floor(Math.random() * (MAX_BOT_COUNT - MIN_BOT_COUNT + 1)) + MIN_BOT_COUNT
   const namesPool = [...BOT_NAMES].sort(() => Math.random() - 0.5)
   const usernamesPool = [...FAKE_USERNAMES].sort(() => Math.random() - 0.5)
   const avatarPool = [...PLAYER_AVATARS].sort(() => Math.random() - 0.5)
+  const giftPool = [...GIFT_FILES].sort(() => Math.random() - 0.5)
   const crashBuffer = Math.max(0.05, crashPoint * 0.1)
   const maxSafePoint = Math.max(1.0, parseFloat((crashPoint - crashBuffer).toFixed(2)))
   const minSafePoint = Math.max(1.0, parseFloat((maxSafePoint - 0.35).toFixed(2)))
 
-  return Array.from({ length: botCount }).map((_, index) => {
-    // Greediness: 0 = conservative (collects early), 1 = greedy (waits long, risks crash)
-    const greediness = Math.random()
-    // Greedy bots prefer higher multipliers, conservative bots prefer lower
-    const preferredMultiplier = minSafePoint + (maxSafePoint - minSafePoint) * greediness
-    const willCollectAt = getRandomBetween(
-      Math.max(minSafePoint, preferredMultiplier - 0.5),
-      Math.min(maxSafePoint, preferredMultiplier + 0.5),
-      2
-    )
-    const avatar = avatarPool[index % avatarPool.length]
-    const baseName = namesPool[index % namesPool.length] ?? `Bot ${index + 1}`
-    const usernameHandle = usernamesPool[index % usernamesPool.length] ?? `@bot${index + 1}`
+  const bots = await Promise.all(
+    Array.from({ length: botCount }).map(async (_, index) => {
+      // Greediness: 0 = conservative (collects early), 1 = greedy (waits long, risks crash)
+      const greediness = Math.random()
+      // Greedy bots prefer higher multipliers, conservative bots prefer lower
+      const preferredMultiplier = minSafePoint + (maxSafePoint - minSafePoint) * greediness
+      const willCollectAt = getRandomBetween(
+        Math.max(minSafePoint, preferredMultiplier - 0.5),
+        Math.min(maxSafePoint, preferredMultiplier + 0.5),
+        2
+      )
+      const avatar = avatarPool[index % avatarPool.length]
+      const baseName = namesPool[index % namesPool.length] ?? `Bot ${index + 1}`
+      const usernameHandle = usernamesPool[index % usernamesPool.length] ?? `@bot${index + 1}`
+      const giftFileName = giftPool[index % giftPool.length]
+      const giftAnimationData = await loadGiftAnimation(giftFileName)
 
-    return {
-      id: `bot-${Date.now()}-${index}`,
-      name: baseName,
-      username: usernameHandle.startsWith('@') ? usernameHandle : `@${usernameHandle}`,
-      avatar,
-      betTon: getRandomBetween(0.2, 25, 2),
-      status: 'countdown' as const,
-      willCollectAt,
-      greediness,
-    }
-  })
+      return {
+        id: `bot-${Date.now()}-${index}`,
+        name: baseName,
+        username: usernameHandle.startsWith('@') ? usernameHandle : `@${usernameHandle}`,
+        avatar,
+        giftAnimationData,
+        giftFileName,
+        status: 'countdown' as const,
+        willCollectAt,
+        greediness,
+      }
+    })
+  )
+
+  return bots
 }
 
 interface TelegramUser {
@@ -495,6 +504,103 @@ function GiftAnimationPlayer({
   )
 }
 
+// List of available gift files
+const GIFT_FILES = [
+  'cleaned-astralshard-arctite.json',
+  'cleaned-astralshard-barbed.json',
+  'cleaned-bunnymuffin-chillout.json',
+  'cleaned-diamondring-frostband.json',
+  'cleaned-diamondring-midnight.json',
+  'cleaned-diamondring-redwedding.json',
+  'cleaned-durovscap-falcon.json',
+  'cleaned-easteregg-deepfreeze.json',
+  'cleaned-eternalcandle-vanillaoasis.json',
+  'cleaned-flyingbroom-subzero.json',
+  'cleaned-gingercookie-frostbite.json',
+  'cleaned-hangingstar-tropicana.json',
+  'cleaned-hexpot-coldbrew.json',
+  'cleaned-hypnolollipop-compactdisk.json',
+  'cleaned-jellybunny-jevil.json',
+  'cleaned-jinglebells-icechime.json',
+  'cleaned-kissedfrog-icefrog.json',
+  'cleaned-lolpop-darkdelight.json',
+  'cleaned-lootbag-aquaatoll.json',
+  'cleaned-lootbag-Vertd\'Eau.json',
+  'cleaned-lunarsnake-fallenstar.json',
+  'cleaned-minioscar-deepfreeze.json',
+  'cleaned-nekohelmet-blackout.json',
+  'cleaned-nekohelmet-greyshark.json',
+  'cleaned-nekohelmet-lagoon.json',
+  'cleaned-partysparkler-cyansizzle.json',
+  'cleaned-perfumebottle-noir.json',
+  'cleaned-plushpepe-frozen.json',
+  'cleaned-plushpepe-guccileap.json',
+  'cleaned-plushpepe-marble.json',
+  'cleaned-plushpepe-peppermint.json',
+  'cleaned-recordplayer-retrosilver.json',
+  'cleaned-recordplayer-winter.json',
+  'cleaned-sakuraflower-icebound.json',
+  'cleaned-santahat-thinice.json',
+  'cleaned-scaredcat-mentos.json',
+  'cleaned-sharptongue-spicymint.json',
+  'cleaned-signetring-spades.json',
+  'cleaned-signetring-titanium.json',
+  'cleaned-snowglobe-oceanoasis.json',
+  'cleaned-spicedwine-overice.json',
+  'cleaned-spyagaric-bliss.json',
+  'cleaned-swisswatch-fulltint.json',
+  'cleaned-swisswatch-icedout.json',
+  'cleaned-swisswatch-timeless.json',
+  'cleaned-tamagadget-vividsky.json',
+  'cleaned-tophat-alabaster.json',
+  'cleaned-toybear-darkknight.json',
+  'cleaned-toybear-snowman.json',
+  'cleaned-vintagecigar-cobalt.json',
+  'cleaned-vintagecigar-icecold.json',
+  'cleaned-vintagecigar-oilbaron.json',
+  'cleaned-voodoodoll-iceblock.json',
+  'cleaned-winterwreath-spirit.json',
+  'darkaura-cleaned-crystalball-9027.json',
+  'darkaura-cleaned-eternalrose-7069.json',
+  'darkaura-cleaned-genielamp-4594.json',
+  'darkaura-cleaned-lootbag-7239.json',
+  'girlish-cleaned-astralshard-3087.json',
+  'girlish-cleaned-eternalcandle-17246.json',
+  'girlish-cleaned-homemadecake-20291.json',
+  'girlish-cleaned-iongem-2891.json',
+  'girlish-cleaned-lolpop-271620.json',
+  'girlish-cleaned-lootbag-7825.json',
+  'girlish-cleaned-nekohelmet-402.json',
+  'girlish-cleaned-plushpepe-2707.json',
+  'girlish-cleaned-starnotepad-34945.json',
+  'girlish-cleaned-toybear-31469.json',
+  'girlish-cleaned-winterwreath-9594.json',
+]
+
+// Cache for loaded gift animations
+const giftAnimationCache = new Map<string, any>()
+
+const loadGiftAnimation = async (fileName: string): Promise<any | null> => {
+  if (giftAnimationCache.has(fileName)) {
+    return giftAnimationCache.get(fileName)
+  }
+
+  try {
+    const giftPath = buildStaticAssetPath(`/gifts/${fileName}`)
+    const response = await fetch(giftPath)
+    if (!response.ok) {
+      console.warn(`Failed to load gift: ${fileName} from ${giftPath}`)
+      return null
+    }
+    const data = await response.json()
+    giftAnimationCache.set(fileName, data)
+    return data
+  } catch (error) {
+    console.warn(`Error loading gift ${fileName}:`, error)
+    return null
+  }
+}
+
 export default function Home() {
   const [mounted, setMounted] = useState(false)
   const [activeTab, setActiveTab] = useState<string>('home')
@@ -565,7 +671,7 @@ export default function Home() {
     initializeApp()
   }, [])
 
-  const startCountdownCycle = useCallback((durationSeconds = 10) => {
+  const startCountdownCycle = useCallback(async (durationSeconds = 10) => {
     const crashPoint = getRandomBetween(1.4, 12, 2)
     crashTargetRef.current = crashPoint
     countdownEndsAtRef.current = Date.now() + durationSeconds * 1000
@@ -576,7 +682,8 @@ export default function Home() {
     setCollectedMultiplier(null)
     setIsUserInCurrentSession(false)
     // Generate new bots for the next session
-    setBotPlayers(generateBotPlayers(crashPoint))
+    const newBots = await generateBotPlayers(crashPoint)
+    setBotPlayers(newBots)
   }, [])
 
   useEffect(() => {
@@ -795,16 +902,20 @@ export default function Home() {
   const players = useMemo(() => {
     const botEntries = botPlayers.map((bot) => {
       let bgColor = 'bg-white/10'
+      let frameColor = 'border-white/20' // Default frame color
       
       // During running: normal background if not collected
       // After collection: green
       // After crash if didn't collect: red
       if (bot.status === 'cashed') {
         bgColor = 'bg-green-500/30'
+        frameColor = 'border-green-400' // Green frame for winners
       } else if (bot.status === 'crashed') {
         bgColor = 'bg-red-500/30'
+        frameColor = 'border-red-400' // Red frame for losers
       } else if (sessionState === 'running' && bot.status === 'flying') {
         bgColor = 'bg-white/10' // Normal during running
+        frameColor = 'border-white/20' // Neutral frame during flight
       }
 
       return {
@@ -812,7 +923,8 @@ export default function Home() {
         name: bot.name,
         username: bot.username,
         avatar: bot.avatar,
-        bet: `${bot.betTon.toFixed(2)} TON`,
+        giftAnimationData: bot.giftAnimationData,
+        giftFileName: bot.giftFileName,
         amount: bot.status === 'cashed' && bot.cashedAt
           ? `${bot.cashedAt.toFixed(2)}x`
           : sessionState === 'running'
@@ -828,6 +940,7 @@ export default function Home() {
                 ? 'Ready'
                 : 'In flight',
         bgColor,
+        frameColor,
       }
     })
 
@@ -840,12 +953,20 @@ export default function Home() {
       userBgColor = collectedMultiplier !== null ? 'bg-green-500/30' : 'bg-red-500/30'
     }
 
+    let userFrameColor = 'border-white/20'
+    if (sessionState === 'running' && isUserInCurrentSession) {
+      userFrameColor = collectedMultiplier !== null ? 'border-green-400' : 'border-white/20'
+    } else if (sessionState === 'crashed' && isUserInCurrentSession) {
+      userFrameColor = collectedMultiplier !== null ? 'border-green-400' : 'border-red-400'
+    }
+
     const youEntry = {
       id: 'you',
         name: 'You',
       username: telegramUser?.username ? `@${telegramUser.username}` : '@you',
       avatar: telegramUser?.photo_url ?? botPlayers[0]?.avatar ?? defaultAvatar,
-      bet: isUserInCurrentSession ? '1.00 TON' : '—',
+      giftAnimationData: null, // User doesn't have a gift bet in the list
+      giftFileName: '',
         amount:
         collectedMultiplier !== null
             ? `${collectedMultiplier.toFixed(2)}x`
@@ -865,6 +986,7 @@ export default function Home() {
                 ? 'Ready'
                 : 'Watching',
       bgColor: userBgColor,
+      frameColor: userFrameColor,
     }
 
     return [...botEntries, youEntry]
@@ -909,7 +1031,8 @@ export default function Home() {
         id: bot.id,
         avatar: bot.avatar,
         username: bot.username,
-        bet: `${bot.betTon.toFixed(2)} TON`,
+        giftAnimationData: bot.giftAnimationData,
+        giftFileName: bot.giftFileName,
         tone,
         statusLabel,
         bgColor,
@@ -922,7 +1045,8 @@ export default function Home() {
         id: 'you',
         avatar: telegramUser?.photo_url ?? botPlayers[0]?.avatar ?? defaultAvatar,
         username: telegramUser?.username ? `@${telegramUser.username}` : '@you',
-        bet: '1.00 TON',
+        giftAnimationData: null,
+        giftFileName: '',
         tone: collectedMultiplier !== null ? 'text-green-400' : 'text-white/60',
         statusLabel: collectedMultiplier !== null 
           ? `Collected @ ${collectedMultiplier.toFixed(2)}x`
@@ -1564,28 +1688,63 @@ export default function Home() {
                     </p>
                   </div>
                   <div className="space-y-4">
-                    {players.map((player) => (
-                    <div
-                      key={player.id}
-                      className={`flex items-center justify-between rounded-2xl border border-white/10 ${player.bgColor} px-6 py-5 text-sm font-medium text-white/90 shadow-[0_15px_35px_-15px_rgba(41,88,255,0.6)] backdrop-blur-lg w-full`}
-                    >
-                      <div className="flex items-center gap-4">
-                        <img
-                          src={player.avatar}
-                          alt={player.name}
-                          className="h-16 w-16 rounded-xl object-cover border border-white/20"
-                        />
-                        <div>
-                          <p className="text-lg font-semibold">{player.name}</p>
-                          <p className="text-sm text-white/60 mt-1">{player.status}</p>
+                    {players.map((player) => {
+                      const isPlayingGift = activeGiftAnimation?.id === `player-${player.id}`
+                      return (
+                        <div
+                          key={player.id}
+                          className={`flex items-center justify-between rounded-2xl border border-white/10 ${player.bgColor} px-6 py-5 text-sm font-medium text-white/90 shadow-[0_15px_35px_-15px_rgba(41,88,255,0.6)] backdrop-blur-lg w-full`}
+                        >
+                          <div className="flex items-center gap-4">
+                            <img
+                              src={player.avatar}
+                              alt={player.name}
+                              className="h-16 w-16 rounded-xl object-cover border border-white/20"
+                            />
+                            <div>
+                              <p className="text-lg font-semibold">{player.name}</p>
+                              <p className="text-sm text-white/60 mt-1">{player.status}</p>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-4">
+                            {player.giftAnimationData ? (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  if (player.giftAnimationData) {
+                                    triggerGiftAnimation(`player-${player.id}`)
+                                  }
+                                }}
+                                className={`relative rounded-xl border-2 ${player.frameColor} bg-white/5 p-2 transition-all hover:scale-105 w-20 h-20 flex items-center justify-center overflow-hidden`}
+                              >
+                                {isPlayingGift && activeGiftAnimation ? (
+                                  <GiftAnimationPlayer
+                                    animationData={player.giftAnimationData}
+                                    playKey={activeGiftAnimation.key}
+                                    className="w-full h-full object-contain"
+                                    onComplete={handleGiftAnimationComplete}
+                                  />
+                                ) : (
+                                  <LottieFirstFrame
+                                    animationData={player.giftAnimationData}
+                                    giftId={player.giftFileName}
+                                    className="w-full h-full object-contain"
+                                    alt="Gift bet"
+                                  />
+                                )}
+                              </button>
+                            ) : (
+                              <div className="w-20 h-20 flex items-center justify-center">
+                                <span className="text-2xl">🎁</span>
+                              </div>
+                            )}
+                            <div className="text-right">
+                              <p className="text-sm text-white/60 mt-1">{player.amount}</p>
+                            </div>
+                          </div>
                         </div>
-                      </div>
-                      <div className="text-right">
-                        <p className="text-lg font-semibold text-blue-100">{player.bet}</p>
-                        <p className="text-sm text-white/60 mt-1">{player.amount}</p>
-                      </div>
-                    </div>
-                  ))}
+                      )
+                    })}
                   </div>
                 </section>
               )}
