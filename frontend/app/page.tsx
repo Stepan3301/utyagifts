@@ -403,62 +403,37 @@ function LottieFirstFrame({ animationData, giftId, className = '', alt = 'Gift' 
   className?: string
   alt?: string
 }) {
-  const [imageSrc, setImageSrc] = useState<string | null>(null)
-  const [isLoading, setIsLoading] = useState(true)
-  const [hasError, setHasError] = useState(false)
+  const lottieRef = useRef<LottieRefCurrentProps>(null)
 
   useEffect(() => {
-    // Only run on client side
-    if (typeof window === 'undefined') {
-      setIsLoading(false)
-      return
-    }
+    if (!lottieRef.current || !animationData) return
 
-    // If no animation data, don't try to load
-    if (!animationData) {
-      setIsLoading(false)
-      setHasError(true)
-      return
-    }
-
-    // Reset state when animationData changes
-    setImageSrc(null)
-    setIsLoading(true)
-    setHasError(false)
-
-    let mounted = true
-
-    const loadFirstFrame = async () => {
-      try {
-        const frameUrl = await extractFirstFrame(animationData, giftId, 512)
-        if (mounted && frameUrl) {
-          setImageSrc(frameUrl)
-          setIsLoading(false)
-        } else if (mounted) {
-          setHasError(true)
-          setIsLoading(false)
-        }
-      } catch (error) {
-        console.warn('Failed to load first frame for', giftId, ':', error)
-        if (mounted) {
-          setHasError(true)
-          setIsLoading(false)
+    // Ensure it's stopped at first frame - try multiple times to ensure it works
+    const setFirstFrame = () => {
+      if (lottieRef.current) {
+        try {
+          lottieRef.current.goToAndStop(0, true)
+          lottieRef.current.setSpeed?.(0)
+        } catch (e) {
+          // Ignore errors
         }
       }
     }
 
-    // Small delay to ensure DOM is ready
-    const timeoutId = setTimeout(() => {
-      loadFirstFrame()
-    }, 50)
+    // Try immediately
+    setFirstFrame()
+    
+    // Try after a short delay
+    const timeout1 = setTimeout(setFirstFrame, 100)
+    const timeout2 = setTimeout(setFirstFrame, 300)
 
     return () => {
-      mounted = false
-      clearTimeout(timeoutId)
+      clearTimeout(timeout1)
+      clearTimeout(timeout2)
     }
   }, [animationData, giftId])
 
-  if (!animationData || hasError) {
+  if (!animationData) {
     return (
       <div className={`flex items-center justify-center ${className}`}>
         <span className="text-4xl">🎁</span>
@@ -466,32 +441,18 @@ function LottieFirstFrame({ animationData, giftId, className = '', alt = 'Gift' 
     )
   }
 
-  if (isLoading) {
-    return (
-      <div className={`flex items-center justify-center ${className}`}>
-        <div className="animate-pulse text-4xl">🎁</div>
-      </div>
-    )
-  }
-
-  if (imageSrc) {
-    return (
-      <img
-        src={imageSrc}
-        alt={alt}
-        className={className}
-        onError={() => {
-          setHasError(true)
-          setImageSrc(null)
-        }}
-      />
-    )
-  }
-
   return (
-    <div className={`flex items-center justify-center ${className}`}>
-      <span className="text-4xl">🎁</span>
-    </div>
+    <Lottie
+      key={giftId} // Force re-render when giftId changes
+      lottieRef={lottieRef}
+      animationData={animationData}
+      loop={false}
+      autoplay={false}
+      className={className}
+      rendererSettings={{
+        preserveAspectRatio: 'xMidYMid meet',
+      }}
+    />
   )
 }
 
@@ -996,12 +957,17 @@ export default function Home() {
         frameColor = 'border-white/20' // Neutral frame during flight
       }
 
+      // Parse animation data to ensure it's valid (same as inventory)
+      const parsedAnimationData = bot.giftAnimationData 
+        ? parseAnimationData(bot.giftAnimationData, bot.giftFileName || bot.id)
+        : null
+
       return {
         id: bot.id,
         name: bot.name,
         username: bot.username,
         avatar: bot.avatar,
-        giftAnimationData: bot.giftAnimationData,
+        giftAnimationData: parsedAnimationData,
         giftFileName: bot.giftFileName,
         amount: bot.status === 'cashed' && bot.cashedAt
           ? `${bot.cashedAt.toFixed(2)}x`
@@ -1796,21 +1762,23 @@ export default function Home() {
                                 }}
                                 className={`relative rounded-xl border-2 ${player.frameColor} bg-white/5 p-2 transition-all hover:scale-105 w-20 h-20 flex items-center justify-center overflow-hidden`}
                               >
-                                {isPlayingGift && playKey ? (
-                                  <GiftAnimationPlayer
-                                    animationData={player.giftAnimationData}
-                                    playKey={playKey}
-                                    className="w-full h-full object-contain"
-                                    onComplete={() => handlePlayerGiftAnimationComplete(player.id)}
-                                  />
-                                ) : (
-                                  <LottieFirstFrame
-                                    animationData={player.giftAnimationData}
-                                    giftId={player.giftFileName || `player-${player.id}`}
-                                    className="w-full h-full object-contain"
-                                    alt="Gift bet"
-                                  />
-                                )}
+                                <div className="w-full h-full flex items-center justify-center">
+                                  {isPlayingGift && playKey ? (
+                                    <GiftAnimationPlayer
+                                      animationData={player.giftAnimationData}
+                                      playKey={playKey}
+                                      className="w-full h-full object-contain"
+                                      onComplete={() => handlePlayerGiftAnimationComplete(player.id)}
+                                    />
+                                  ) : (
+                                    <LottieFirstFrame
+                                      animationData={player.giftAnimationData}
+                                      giftId={player.giftFileName || `player-${player.id}`}
+                                      className="w-full h-full object-contain"
+                                      alt="Gift bet"
+                                    />
+                                  )}
+                                </div>
                               </button>
                             ) : (
                               // Show placeholder while gift loads
