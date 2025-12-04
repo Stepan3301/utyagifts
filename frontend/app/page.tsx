@@ -618,6 +618,7 @@ export default function Home() {
   const [isQueuedForNextSession, setIsQueuedForNextSession] = useState(false)
   const [isUserInCurrentSession, setIsUserInCurrentSession] = useState(false)
   const [activeGiftAnimation, setActiveGiftAnimation] = useState<{ id: string; key: number } | null>(null)
+  const [playingGiftAnimations, setPlayingGiftAnimations] = useState<Map<string, number>>(new Map())
   const [botPlayers, setBotPlayers] = useState<BotPlayer[]>([])
   const animationRef = useRef<LottieRefCurrentProps>(null)
   const crashTargetRef = useRef<number>(10)
@@ -836,6 +837,22 @@ export default function Home() {
 
   const handleGiftAnimationComplete = useCallback(() => {
     setActiveGiftAnimation(null)
+  }, [])
+
+  const triggerPlayerGiftAnimation = useCallback((playerId: string) => {
+    setPlayingGiftAnimations((prev) => {
+      const newMap = new Map(prev)
+      newMap.set(playerId, Date.now())
+      return newMap
+    })
+  }, [])
+
+  const handlePlayerGiftAnimationComplete = useCallback((playerId: string) => {
+    setPlayingGiftAnimations((prev) => {
+      const newMap = new Map(prev)
+      newMap.delete(playerId)
+      return newMap
+    })
   }, [])
   const gradientOverlay = useMemo(
     () =>
@@ -1689,7 +1706,8 @@ export default function Home() {
                   </div>
                   <div className="space-y-4">
                     {players.map((player) => {
-                      const isPlayingGift = activeGiftAnimation?.id === `player-${player.id}`
+                      const playKey = playingGiftAnimations.get(player.id)
+                      const isPlayingGift = playKey !== undefined
                       return (
                         <div
                           key={player.id}
@@ -1712,17 +1730,17 @@ export default function Home() {
                                 type="button"
                                 onClick={() => {
                                   if (player.giftAnimationData) {
-                                    triggerGiftAnimation(`player-${player.id}`)
+                                    triggerPlayerGiftAnimation(player.id)
                                   }
                                 }}
                                 className={`relative rounded-xl border-2 ${player.frameColor} bg-white/5 p-2 transition-all hover:scale-105 w-20 h-20 flex items-center justify-center overflow-hidden`}
                               >
-                                {isPlayingGift && activeGiftAnimation ? (
+                                {isPlayingGift && playKey ? (
                                   <GiftAnimationPlayer
                                     animationData={player.giftAnimationData}
-                                    playKey={activeGiftAnimation.key}
+                                    playKey={playKey}
                                     className="w-full h-full object-contain"
-                                    onComplete={handleGiftAnimationComplete}
+                                    onComplete={() => handlePlayerGiftAnimationComplete(player.id)}
                                   />
                                 ) : (
                                   <LottieFirstFrame
