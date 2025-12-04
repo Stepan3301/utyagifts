@@ -362,7 +362,14 @@ const generateBotPlayers = async (crashPoint: number): Promise<BotPlayer[]> => {
       const baseName = namesPool[index % namesPool.length] ?? `Bot ${index + 1}`
       const usernameHandle = usernamesPool[index % usernamesPool.length] ?? `@bot${index + 1}`
       const giftFileName = giftPool[index % giftPool.length]
-      const giftAnimationData = await loadGiftAnimation(giftFileName)
+      
+      // Load gift animation - retry if it fails
+      let giftAnimationData = await loadGiftAnimation(giftFileName)
+      if (!giftAnimationData) {
+        // Try loading a different gift if the first one fails
+        const fallbackGift = giftPool[(index + 1) % giftPool.length]
+        giftAnimationData = await loadGiftAnimation(fallbackGift)
+      }
 
       return {
         id: `bot-${Date.now()}-${index}`,
@@ -398,6 +405,7 @@ function LottieFirstFrame({ animationData, giftId, className = '', alt = 'Gift' 
 }) {
   const [imageSrc, setImageSrc] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(true)
+  const [hasError, setHasError] = useState(false)
 
   useEffect(() => {
     // Only run on client side
@@ -406,34 +414,62 @@ function LottieFirstFrame({ animationData, giftId, className = '', alt = 'Gift' 
       return
     }
 
+    // If no animation data, don't try to load
+    if (!animationData) {
+      setIsLoading(false)
+      setHasError(true)
+      return
+    }
+
+    // Reset state when animationData changes
+    setImageSrc(null)
+    setIsLoading(true)
+    setHasError(false)
+
     let mounted = true
 
     const loadFirstFrame = async () => {
       try {
         const frameUrl = await extractFirstFrame(animationData, giftId, 512)
-        if (mounted) {
+        if (mounted && frameUrl) {
           setImageSrc(frameUrl)
+          setIsLoading(false)
+        } else if (mounted) {
+          setHasError(true)
           setIsLoading(false)
         }
       } catch (error) {
-        console.warn('Failed to load first frame:', error)
+        console.warn('Failed to load first frame for', giftId, ':', error)
         if (mounted) {
+          setHasError(true)
           setIsLoading(false)
         }
       }
     }
 
-    loadFirstFrame()
+    // Small delay to ensure DOM is ready
+    const timeoutId = setTimeout(() => {
+      loadFirstFrame()
+    }, 50)
 
     return () => {
       mounted = false
+      clearTimeout(timeoutId)
     }
   }, [animationData, giftId])
+
+  if (!animationData || hasError) {
+    return (
+      <div className={`flex items-center justify-center ${className}`}>
+        <span className="text-4xl">🎁</span>
+      </div>
+    )
+  }
 
   if (isLoading) {
     return (
       <div className={`flex items-center justify-center ${className}`}>
-        <div className="animate-spin text-4xl">🎁</div>
+        <div className="animate-pulse text-4xl">🎁</div>
       </div>
     )
   }
@@ -444,6 +480,10 @@ function LottieFirstFrame({ animationData, giftId, className = '', alt = 'Gift' 
         src={imageSrc}
         alt={alt}
         className={className}
+        onError={() => {
+          setHasError(true)
+          setImageSrc(null)
+        }}
       />
     )
   }
@@ -589,15 +629,33 @@ const loadGiftAnimation = async (fileName: string): Promise<any | null> => {
     const giftPath = buildStaticAssetPath(`/gifts/${fileName}`)
     const response = await fetch(giftPath)
     if (!response.ok) {
-      console.warn(`Failed to load gift: ${fileName} from ${giftPath}`)
+      console.warn(`Failed to load gift: ${fileName} from ${giftPath}, status: ${response.status}`)
       return null
     }
     const data = await response.json()
-    giftAnimationCache.set(fileName, data)
-    return data
+    if (data && typeof data === 'object' && 'v' in data) {
+      giftAnimationCache.set(fileName, data)
+      return data
+    } else {
+      console.warn(`Invalid gift data format for: ${fileName}`)
+      return null
+    }
   } catch (error) {
     console.warn(`Error loading gift ${fileName}:`, error)
     return null
+  }
+}
+
+// Preload all gift animations on app start
+const preloadAllGifts = async (): Promise<void> => {
+  if (typeof window === 'undefined') return
+  
+  try {
+    const loadPromises = GIFT_FILES.slice(0, 20).map(fileName => loadGiftAnimation(fileName))
+    await Promise.allSettled(loadPromises)
+    console.log('✅ Preloaded gift animations')
+  } catch (error) {
+    console.warn('Failed to preload some gifts:', error)
   }
 }
 
@@ -667,6 +725,9 @@ export default function Home() {
       }
 
     setMounted(true)
+    
+    // Preload gift animations
+    preloadAllGifts()
     }
 
     initializeApp()
@@ -1745,15 +1806,16 @@ export default function Home() {
                                 ) : (
                                   <LottieFirstFrame
                                     animationData={player.giftAnimationData}
-                                    giftId={player.giftFileName}
+                                    giftId={player.giftFileName || `player-${player.id}`}
                                     className="w-full h-full object-contain"
                                     alt="Gift bet"
                                   />
                                 )}
                               </button>
                             ) : (
-                              <div className="w-20 h-20 flex items-center justify-center">
-                                <span className="text-2xl">🎁</span>
+                              // Show placeholder while gift loads
+                              <div className={`relative rounded-xl border-2 ${player.frameColor} bg-white/5 p-2 w-20 h-20 flex items-center justify-center overflow-hidden`}>
+                                <div className="animate-pulse text-2xl">🎁</div>
                               </div>
                             )}
                             <div className="text-right">
