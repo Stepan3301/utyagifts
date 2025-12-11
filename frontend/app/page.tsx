@@ -805,6 +805,53 @@ export default function Home() {
               console.error('Failed to register user:', error)
             }
           }
+
+          // Preload inventory immediately on app start (don't wait for gifts tab)
+          try {
+            console.log('📦 Preloading inventory...')
+            const response: InventoryResponse = await inventoryApi.getInventory()
+            const gifts = response.inventory || []
+            setInventory(gifts)
+            console.log(`✅ Preloaded ${gifts.length} gifts`)
+
+            // Process any unprocessed gifts in background
+            const needsProcessing = gifts.some(g => g.gift_url && !g.animation_data)
+            if (needsProcessing) {
+              giftProcessingApi.processAllUnprocessed()
+                .then((result) => {
+                  console.log('Background processing completed:', result)
+                  return inventoryApi.getInventory()
+                })
+                .then((updatedResponse: InventoryResponse) => {
+                  setInventory(updatedResponse.inventory || [])
+                })
+                .catch(err => console.warn('Background processing failed:', err))
+            }
+
+            // Update floor prices if needed
+            const needsPriceUpdate = gifts.some(g => {
+              if (!g.gift_url) return false
+              if (!g.floor_price_updated_at) return true
+              const updatedAt = new Date(g.floor_price_updated_at).getTime()
+              const thirtyMinutesAgo = Date.now() - 30 * 60 * 1000
+              return updatedAt < thirtyMinutesAgo
+            })
+
+            if (needsPriceUpdate) {
+              console.log('🔄 Triggering floor price updates...')
+              floorPriceApi.updateAllFloorPrices(30)
+                .then((result) => {
+                  console.log('Floor price update completed:', result)
+                  return inventoryApi.getInventory()
+                })
+                .then((updatedResponse: InventoryResponse) => {
+                  setInventory(updatedResponse.inventory || [])
+                })
+                .catch(err => console.warn('Floor price update failed:', err))
+            }
+          } catch (error: any) {
+            console.warn('⚠️ Failed to preload inventory:', error.message || error)
+          }
         }
       } catch (error) {
         console.warn('Telegram WebApp SDK init failed, continuing in fallback mode.', error)
