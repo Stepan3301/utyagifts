@@ -10,6 +10,7 @@ import { inventoryRouter } from './routes/inventory';
 import { gameRouter } from './routes/game';
 import { healthRouter } from './routes/health';
 import { giftProcessingRouter } from './routes/giftProcessing';
+import floorPriceRouter from './routes/floorPrice';
 import { telegramService } from './services/telegramService';
 import { giftProcessingService } from './services/giftProcessingService';
 
@@ -52,6 +53,7 @@ app.use('/api/auth', authRouter);
 app.use('/api/inventory', inventoryRouter);
 app.use('/api/game', gameRouter);
 app.use('/api/gifts', giftProcessingRouter);
+app.use('/api/floor-price', floorPriceRouter);
 
 // Error handling
 app.use(errorHandler);

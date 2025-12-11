@@ -7,7 +7,7 @@ import Lottie, { type LottieRefCurrentProps } from 'lottie-react'
 
 import rocketAnimation from '@/public/animations/rocket.json'
 import arrowsAnimation from '@/public/animations/arrows.json'
-import { authApi, inventoryApi, giftProcessingApi, type InventoryResponse } from '@/lib/api'
+import { authApi, inventoryApi, giftProcessingApi, floorPriceApi, type InventoryResponse } from '@/lib/api'
 
 type Gift = InventoryResponse['inventory'][number]
 
@@ -138,6 +138,51 @@ const PLAYER_AVATARS = [
   '/avatars/cxz.jpg',
   '/avatars/gg2.jpg',
   '/avatars/zzz1.jpg',
+  // New avatars from AvatarsRocket2
+  '/avatars/03f57d377e2c50343111b2498ddc846d.jpg',
+  '/avatars/054aa5023fe8c4f4a7ffa32ed3e8b803.jpg',
+  '/avatars/05980f2a5de194956756b17fcaaec72e.jpg',
+  '/avatars/0b4c138a37204b4498f9e0b0454894d6.jpg',
+  '/avatars/0bcb2d98e49d433eb79203282921d018.jpg',
+  '/avatars/0c1b4ab6666335df99214aec6ebe82d4.jpg',
+  '/avatars/0d56b71053e5e87c85bdc66532f0b929.jpg',
+  '/avatars/0f4f1ddd7944a9c330443dadd3805e39.jpg',
+  '/avatars/10e2c656fd02f8a906db601b68e0b4b9.jpg',
+  '/avatars/3704115cf0267e0765d83e2bc053a925.jpg',
+  '/avatars/39285b742b18dfd5b3cbb00abdf697c2.jpg',
+  '/avatars/3a5086b805b8aef5ab2073612cb506f9.jpg',
+  '/avatars/3e59f48302d71efe60a956f46e066b8b.jpg',
+  '/avatars/3f4e0c241e60fb3fc28b3289122b626d.jpg',
+  '/avatars/487b29f1bf1d5e2a9829ebc50cb56c7e.jpg',
+  '/avatars/4b61f32732e300c4be131d9842b3b82c.jpg',
+  '/avatars/4d2644c6c59ec4d3544b4531504df8a5.jpg',
+  '/avatars/509b23638af60c9bb3075d0fa59824b1.jpg',
+  '/avatars/59f769d1a78182cf8ede2ab33981c4fc.jpg',
+  '/avatars/7213feab6c5e9392717d94655d86517e.jpg',
+  '/avatars/7d148071f6a5d3b3a524d2fb5561887f.jpg',
+  '/avatars/7d1bda991f58b70c8517079ac201dd62.jpg',
+  '/avatars/7f73a6bbdaa4f6083dbcf9ec7ca22ebc.jpg',
+  '/avatars/8039ce6cc6040de86b42df8105a1a9a9.jpg',
+  '/avatars/8b02abe8761a5992b30e85276d29504c.jpg',
+  '/avatars/939fb8ff7221a6bd9086b183a8d9deb6.jpg',
+  '/avatars/93cb4a8c68120d794643de8d65401be2.jpg',
+  '/avatars/942e1afd21135e5c468a6615e2639929.jpg',
+  '/avatars/99085393818068a622f785de171f053a.jpg',
+  '/avatars/9be96162d0482fa2183cb533a1ba58c6.jpg',
+  '/avatars/ab91025815049e067972f1f625177b30.jpg',
+  '/avatars/ab9732a47d4e8da7d6a1dc2dbd3cc784.jpg',
+  '/avatars/b5c65d071c3e4f4165d6592788ec5015.jpg',
+  '/avatars/ba58389da04adc50126c562da00174a9.jpg',
+  '/avatars/bbb494c9c36b00483339286eaa0edf41.jpg',
+  '/avatars/c813fe05ef4f64b39cf7c95e73206740.jpg',
+  '/avatars/cc6bc94e8875f947b59ab8d446291232.jpg',
+  '/avatars/ced38f3f779f043a2b0772428357b3be.jpg',
+  '/avatars/d0d0a13d33a0391884f793b8f1ed490c.jpg',
+  '/avatars/d157216718874513aea15caba75c4977.jpg',
+  '/avatars/d4a4ae830cc7ce3af886a20a086fc741.jpg',
+  '/avatars/d846913c33784f0e77755da54315156c.jpg',
+  '/avatars/e4b86d0875995ec448dc029be7ead95f.jpg',
+  '/avatars/ef6ea97636f128d0ce25e79f3ee16901.jpg',
 ].map(buildStaticAssetPath)
 
 const FAKE_USERNAMES = [
@@ -509,14 +554,20 @@ function GiftAnimationPlayer({
         currentInstance.goToAndStop(0, true)
         // Set normal speed
         currentInstance.setSpeed?.(1)
-        // Play from beginning to end
-        currentInstance.playSegments?.([0, -1], true) || currentInstance.play()
+        // Play from beginning to end - try playSegments first, fallback to play
+        if (currentInstance.playSegments) {
+          currentInstance.playSegments([0, -1], true)
+        } else {
+          currentInstance.play()
+        }
         eventTarget.addEventListener?.('complete', handleComplete)
       } catch (error) {
         console.warn('Error playing animation:', error)
         // Fallback to regular play
         try {
-          animationRef.current?.play()
+          if (animationRef.current) {
+            animationRef.current.play()
+          }
         } catch (e) {
           console.warn('Fallback play also failed:', e)
         }
@@ -902,6 +953,31 @@ export default function Home() {
               })
               .catch(err => {
                 console.warn('Background processing failed:', err)
+              })
+          }
+          
+          // Check if any gifts need floor price updates (prices older than 30 min or no price)
+          const needsPriceUpdate = gifts.some(g => {
+            if (!g.gift_url) return false
+            if (!g.floor_price_updated_at) return true
+            const updatedAt = new Date(g.floor_price_updated_at).getTime()
+            const thirtyMinutesAgo = Date.now() - 30 * 60 * 1000
+            return updatedAt < thirtyMinutesAgo
+          })
+          
+          if (needsPriceUpdate) {
+            console.log('🔄 Triggering floor price updates...')
+            floorPriceApi.updateAllFloorPrices(30)
+              .then((result) => {
+                console.log('Floor price update completed:', result)
+                // Refetch inventory to get updated prices
+                return inventoryApi.getInventory()
+              })
+              .then((updatedResponse: InventoryResponse) => {
+                setInventory(updatedResponse.inventory || [])
+              })
+              .catch(err => {
+                console.warn('Floor price update failed:', err)
               })
           }
         } catch (error: any) {
@@ -1589,6 +1665,11 @@ export default function Home() {
                         const hasStaticPreview = Boolean(gift.image_url)
                         const isPlaying = activeGiftAnimation?.id === gift.id
                         
+                        // Format floor price for display
+                        const floorPriceDisplay = gift.floor_price !== null && gift.floor_price !== undefined
+                          ? `${gift.floor_price.toFixed(1)} ${gift.floor_price_asset || 'TON'}`
+                          : '? TON'
+                        
                         return (
                           <button
                             type="button"
@@ -1600,6 +1681,13 @@ export default function Home() {
                             }}
                             className="relative rounded-2xl border border-white/10 bg-white/5 aspect-square overflow-hidden backdrop-blur-lg hover:bg-white/10 transition-all text-left"
                           >
+                            {/* Floor Price Badge - Top Right */}
+                            <div className="absolute top-2 right-2 z-20 px-2 py-1 rounded-lg bg-black/60 backdrop-blur-sm border border-white/20">
+                              <span className={`text-xs font-bold ${gift.floor_price !== null ? 'text-emerald-400' : 'text-white/60'}`}>
+                                {floorPriceDisplay}
+                              </span>
+                            </div>
+                            
                             {isProcessing && !animationData && !hasStaticPreview ? (
                               <div className="w-full h-full flex flex-col items-center justify-center p-4">
                                 <div className="animate-spin text-4xl mb-2">🎁</div>

@@ -68,6 +68,11 @@ export interface Database {
           external_url: string | null
           rarity: string | null
           animation_tgs_path: string | null
+          floor_price: number | null // Floor price in TON
+          floor_price_asset: string | null // Currency (default: TON)
+          model: string | null // NFT model name
+          collection_id: number | null // Portals collection ID
+          floor_price_updated_at: string | null // Last price update timestamp
           created_at: string
           updated_at: string
         }
@@ -82,6 +87,11 @@ export interface Database {
           external_url?: string | null
           rarity?: string | null
           animation_tgs_path?: string | null
+          floor_price?: number | null
+          floor_price_asset?: string | null
+          model?: string | null
+          collection_id?: number | null
+          floor_price_updated_at?: string | null
           created_at?: string
           updated_at?: string
         }
@@ -96,6 +106,11 @@ export interface Database {
           external_url?: string | null
           rarity?: string | null
           animation_tgs_path?: string | null
+          floor_price?: number | null
+          floor_price_asset?: string | null
+          model?: string | null
+          collection_id?: number | null
+          floor_price_updated_at?: string | null
           created_at?: string
           updated_at?: string
         }

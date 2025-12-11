@@ -226,6 +226,11 @@ export interface InventoryResponse {
     gift_url: string | null
     external_url: string | null
     rarity: string | null
+    floor_price: number | null
+    floor_price_asset: string | null
+    model: string | null
+    collection_id: number | null
+    floor_price_updated_at: string | null
     created_at: string
     updated_at: string
   }>
@@ -243,6 +248,11 @@ export interface GiftResponse {
     gift_url: string | null
     external_url: string | null
     rarity: string | null
+    floor_price: number | null
+    floor_price_asset: string | null
+    model: string | null
+    collection_id: number | null
+    floor_price_updated_at: string | null
     created_at: string
     updated_at: string
   }
@@ -262,6 +272,43 @@ export const giftProcessingApi = {
     apiClient.post('/gifts/process-and-update', { giftId, giftUrl }),
   processAllUnprocessed: () =>
     apiClient.post('/gifts/process-all', {}),
+}
+
+// Floor Price API types
+export interface FloorPriceResponse {
+  giftId: string
+  name: string | null
+  model: string | null
+  collectionId: number | null
+  floorPrice: number | null
+  floorPriceAsset: string
+  lastUpdated: string | null
+  giftUrl: string | null
+}
+
+export interface UpdateAllFloorPricesResponse {
+  success: boolean
+  updated: number
+  failed: number
+}
+
+// Floor Price API
+export const floorPriceApi = {
+  // Get floor price info for a specific gift
+  getGiftFloorPrice: (giftId: string) =>
+    apiClient.get<FloorPriceResponse>(`/floor-price/${giftId}`),
+  
+  // Update floor price for a specific gift
+  updateGiftFloorPrice: (giftId: string) =>
+    apiClient.post<FloorPriceResponse>(`/floor-price/update/${giftId}`),
+  
+  // Update floor prices for all gifts
+  updateAllFloorPrices: (maxAgeMinutes = 30) =>
+    apiClient.post<UpdateAllFloorPricesResponse>('/floor-price/update-all', { maxAgeMinutes }),
+  
+  // Set Portals authorization token
+  setPortalsToken: (token: string) =>
+    apiClient.post('/floor-price/set-token', { token }),
 }
 
 // Game API types
