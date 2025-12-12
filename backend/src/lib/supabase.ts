@@ -120,6 +120,7 @@ export interface Database {
           id: string
           user_id: string
           gift_id: string | null
+          bet_gifts: any | null // JSONB array of gift IDs
           multiplier: number | null
           status: string
           crashed_at: string | null
@@ -133,6 +134,7 @@ export interface Database {
           id?: string
           user_id: string
           gift_id?: string | null
+          bet_gifts?: any | null
           multiplier?: number | null
           status?: string
           crashed_at?: string | null
@@ -146,6 +148,7 @@ export interface Database {
           id?: string
           user_id?: string
           gift_id?: string | null
+          bet_gifts?: any | null
           multiplier?: number | null
           status?: string
           crashed_at?: string | null

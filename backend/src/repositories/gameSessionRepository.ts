@@ -2,7 +2,8 @@ import { supabase, type GameSession as DBGameSession } from '../lib/supabase'
 
 export interface CreateSessionData {
   userId: string
-  giftId: string
+  giftId?: string // Optional for backward compatibility
+  betGifts?: string[] // Array of gift IDs from user's inventory
   multiplier: number
   status: 'countdown' | 'running' | 'crashed' | 'cashed_out'
   countdownEndsAt: number
@@ -14,6 +15,7 @@ export interface UpdateSessionData {
   crashedAt?: number
   cashedOutAt?: number
   startedAt?: number
+  betGifts?: string[]
 }
 
 class GameSessionRepository {
@@ -88,7 +90,8 @@ class GameSessionRepository {
       .from('game_sessions')
       .insert({
         user_id: data.userId,
-        gift_id: data.giftId,
+        gift_id: data.giftId || null,
+        bet_gifts: data.betGifts || [],
         multiplier: data.multiplier,
         status: data.status,
         countdown_ends_at: new Date(data.countdownEndsAt).toISOString(),
@@ -120,6 +123,9 @@ class GameSessionRepository {
     }
     if (data.startedAt !== undefined) {
       updateData.started_at = new Date(data.startedAt).toISOString()
+    }
+    if (data.betGifts !== undefined) {
+      updateData.bet_gifts = data.betGifts
     }
 
     const { data: session, error } = await supabase

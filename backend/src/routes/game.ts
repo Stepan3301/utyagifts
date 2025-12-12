@@ -22,3 +22,6 @@ gameRouter.get('/session/history', gameController.getSessionHistory);
 // Get current session status for the authenticated user
 gameRouter.get('/session/current', gameController.getCurrentSession);
 
+// Get win gift options for a session
+gameRouter.get('/session/:sessionId/win-options', gameController.getWinGiftOptions);
+

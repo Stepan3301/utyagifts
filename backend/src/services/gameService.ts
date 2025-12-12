@@ -1,12 +1,14 @@
 import { gameSessionRepository } from '../repositories/gameSessionRepository';
 import { giftService } from './giftService';
 import { poolService } from './poolService';
+import { gameWinLossService, type BetGift } from './gameWinLossService';
 import type { GameSession as DBGameSession } from '../lib/supabase';
 
 export interface GameSession {
   id: string;
   userId: string;
   giftId: string;
+  betGifts?: string[]; // Array of gift IDs from inventory
   crashPoint: number;
   status: 'countdown' | 'running' | 'crashed' | 'cashed_out';
   createdAt: Date;
@@ -17,10 +19,17 @@ export interface GameSession {
 }
 
 function mapGameSession(dbSession: DBGameSession): GameSession {
+  const betGifts = dbSession.bet_gifts
+    ? (Array.isArray(dbSession.bet_gifts)
+        ? dbSession.bet_gifts
+        : JSON.parse(dbSession.bet_gifts as string))
+    : undefined;
+
   return {
     id: dbSession.id,
     userId: dbSession.user_id,
     giftId: dbSession.gift_id || '',
+    betGifts,
     crashPoint: dbSession.multiplier ? Number(dbSession.multiplier) : 0,
     status: dbSession.status as GameSession['status'],
     createdAt: new Date(dbSession.created_at),
@@ -94,7 +103,29 @@ class GameService {
           crashedAt: crashTimestamp,
         });
 
-        if (session.gift_id) {
+        // Handle loss: Move bet gifts to relayer
+        const betGifts = session.bet_gifts
+          ? (Array.isArray(session.bet_gifts)
+              ? session.bet_gifts
+              : JSON.parse(session.bet_gifts as string))
+          : [];
+
+        if (betGifts.length > 0) {
+          try {
+            const betGiftsWithPrices = await gameWinLossService.getBetGiftsWithPrices(
+              session.user_id,
+              betGifts
+            );
+            await gameWinLossService.handleLoss(session.user_id, betGiftsWithPrices);
+          } catch (error) {
+            console.error('Error handling loss:', error);
+            // Fallback to old behavior if bet gifts fail
+            if (session.gift_id) {
+              await giftService.moveGiftToPool(session.gift_id);
+            }
+          }
+        } else if (session.gift_id) {
+          // Fallback to old behavior for single gift
           await giftService.moveGiftToPool(session.gift_id);
         }
       }
@@ -103,13 +134,30 @@ class GameService {
     return session;
   }
 
-  async startSession(userId: string, giftId: string): Promise<GameSession> {
-    const gift = await giftService.getGiftById(giftId, userId);
-    if (!gift) {
-      throw new Error('Invalid gift or not owned');
-    }
+  async startSession(
+    userId: string,
+    options: { giftId?: string; betGifts?: string[] }
+  ): Promise<GameSession> {
+    // Support both old single gift and new multiple bet gifts
+    const { giftId, betGifts } = options;
 
-    await giftService.setGiftInGame(giftId);
+    if (betGifts && betGifts.length > 0) {
+      // Validate all bet gifts exist in user's inventory
+      const betGiftsWithPrices = await gameWinLossService.getBetGiftsWithPrices(
+        userId,
+        betGifts
+      );
+      // Validation passed if no error thrown
+    } else if (giftId) {
+      // Old behavior: single gift
+      const gift = await giftService.getGiftById(giftId, userId);
+      if (!gift) {
+        throw new Error('Invalid gift or not owned');
+      }
+      await giftService.setGiftInGame(giftId);
+    } else {
+      throw new Error('Either giftId or betGifts must be provided');
+    }
 
     const crashPoint = this.generateCrashPoint();
     const now = Date.now();
@@ -118,6 +166,7 @@ class GameService {
     const dbSession = await gameSessionRepository.create({
       userId,
       giftId,
+      betGifts,
       multiplier: crashPoint,
       status: 'countdown',
       countdownEndsAt,
@@ -126,7 +175,7 @@ class GameService {
     return mapGameSession(dbSession);
   }
 
-  async cashOut(userId: string, sessionId: string) {
+  async cashOut(userId: string, sessionId: string, chosenGiftId?: string) {
     const dbSession = await gameSessionRepository.findById(sessionId);
 
     if (!dbSession || dbSession.user_id !== userId) {
@@ -142,11 +191,55 @@ class GameService {
 
     if (session.status !== 'running') {
       if (session.status === 'crashed') {
-      throw new Error('Session already crashed');
+        throw new Error('Session already crashed');
       }
       throw new Error('Session is not running');
     }
 
+    // Handle win with bet gifts
+    const betGifts = session.betGifts || [];
+    if (betGifts.length > 0) {
+      if (!chosenGiftId) {
+        throw new Error('chosenGiftId is required when using bet gifts');
+      }
+
+      const betGiftsWithPrices = await gameWinLossService.getBetGiftsWithPrices(
+        userId,
+        betGifts
+      );
+
+      // Calculate new gift price based on average of bet gifts
+      const totalPrice = betGiftsWithPrices.reduce(
+        (sum, gift) => sum + (gift.floorPrice || 0),
+        0
+      );
+      const avgPrice = betGiftsWithPrices.length > 0 ? totalPrice / betGiftsWithPrices.length : 0;
+      const newGiftPrice = gameWinLossService.calculateNewGiftPrice(
+        avgPrice > 0 ? avgPrice : null,
+        session.crashPoint
+      );
+
+      // Exchange gifts
+      const wonGift = await gameWinLossService.handleWin(
+        userId,
+        betGiftsWithPrices,
+        chosenGiftId
+      );
+
+      await gameSessionRepository.update(sessionId, {
+        status: 'cashed_out',
+        cashedOutAt: Date.now(),
+      });
+
+      return {
+        success: true,
+        multiplier: session.crashPoint,
+        wonGift,
+        newGiftPrice,
+      };
+    }
+
+    // Fallback to old behavior for single gift
     const winnings = Math.floor(session.crashPoint);
     const awardedGiftId = await poolService.getRandomGift(winnings);
 
@@ -164,6 +257,57 @@ class GameService {
       multiplier: session.crashPoint,
       giftId: awardedGiftId,
     };
+  }
+
+  /**
+   * Get win gift options for a session (before cashing out)
+   */
+  async getWinGiftOptions(sessionId: string): Promise<{
+    options: Array<{
+      id: string;
+      name: string;
+      image: string | null;
+      url: string;
+      floorPrice: number | null;
+      animationData: any | null;
+    }>;
+    newGiftPrice: number | null;
+  }> {
+    const dbSession = await gameSessionRepository.findById(sessionId);
+    if (!dbSession) {
+      throw new Error('Session not found');
+    }
+
+    const session = mapGameSession(dbSession);
+    const betGifts = session.betGifts || [];
+
+    if (betGifts.length === 0) {
+      throw new Error('No bet gifts found in session');
+    }
+
+    const betGiftsWithPrices = await gameWinLossService.getBetGiftsWithPrices(
+      session.userId,
+      betGifts
+    );
+
+    // Calculate new gift price based on average of bet gifts
+    const totalPrice = betGiftsWithPrices.reduce(
+      (sum, gift) => sum + (gift.floorPrice || 0),
+      0
+    );
+    const avgPrice = betGiftsWithPrices.length > 0 ? totalPrice / betGiftsWithPrices.length : 0;
+    const newGiftPrice = gameWinLossService.calculateNewGiftPrice(
+      avgPrice > 0 ? avgPrice : null,
+      session.crashPoint
+    );
+
+    if (newGiftPrice === null) {
+      return { options: [], newGiftPrice: null };
+    }
+
+    const options = await gameWinLossService.findMatchingGifts(newGiftPrice);
+
+    return { options, newGiftPrice };
   }
 
   async getCurrentSession(userId: string): Promise<GameSession | null> {

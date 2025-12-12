@@ -322,6 +322,21 @@ export interface GameSessionPayload {
   cashedOutAt?: number
   createdAt: number
   giftId: string
+  betGifts?: string[] // Array of gift IDs from inventory
+}
+
+export interface WinGiftOption {
+  id: string
+  name: string
+  image: string | null
+  url: string
+  floorPrice: number | null
+  animationData: any | null
+}
+
+export interface WinGiftOptionsResponse {
+  options: WinGiftOption[]
+  newGiftPrice: number | null
 }
 
 export interface StartSessionResponse {
@@ -334,13 +349,15 @@ export interface CurrentSessionResponse {
 
 // Game API
 export const gameApi = {
-  startSession: (giftId: string) =>
-    apiClient.post<StartSessionResponse>('/game/session/start', { giftId }),
-  cashOut: (sessionId: string) =>
-    apiClient.post(`/game/session/${sessionId}/cashout`),
+  startSession: (options: { giftId?: string; betGifts?: string[] }) =>
+    apiClient.post<StartSessionResponse>('/game/session/start', options),
+  cashOut: (sessionId: string, chosenGiftId?: string) =>
+    apiClient.post(`/game/session/${sessionId}/cashout`, chosenGiftId ? { chosenGiftId } : {}),
   getActiveSession: () => apiClient.get<{ session: GameSessionPayload | null }>('/game/session/active'),
   getCurrentSession: () => apiClient.get<CurrentSessionResponse>('/game/session/current'),
   getSessionHistory: (limit = 20, offset = 0) =>
     apiClient.get(`/game/session/history?limit=${limit}&offset=${offset}`),
+  getWinGiftOptions: (sessionId: string) =>
+    apiClient.get<WinGiftOptionsResponse>(`/game/session/${sessionId}/win-options`),
 }
 
