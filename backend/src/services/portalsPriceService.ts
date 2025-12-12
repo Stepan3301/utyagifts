@@ -19,7 +19,7 @@ export interface GiftFloorResult {
   giftUrl: string;
   name: string | null;
   model: string | null;
-  collectionId: number | null;
+  collectionId: string | null;
   floorPrice: FloorPriceData | null;
 }
 
@@ -79,22 +79,20 @@ class PortalsPriceService {
       }
 
       // Try to extract model from the page content
-      // Model appears as "Model Night Market 0.8%" in the page
+      // Handles patterns such as:
+      //   Model Night Market 0.8%
+      //   Model   | Pixel Perfect 0.2%
       let model: string | null = null;
-      
-      // Look for Model in the page content
-      // The format is usually: Model <model_name> <percentage>%
-      const modelMatch = html.match(/Model\s+([^<]+?)\s+[\d.]+%/i);
-      if (modelMatch && modelMatch[1]) {
-        model = modelMatch[1].trim();
-      }
-
-      // Alternative: Try to find model in structured data or other meta tags
-      if (!model) {
-        // Some pages might have the model in different formats
-        const altModelMatch = html.match(/"model"\s*:\s*"([^"]+)"/i);
-        if (altModelMatch && altModelMatch[1]) {
-          model = altModelMatch[1].trim();
+      const modelPatterns = [
+        /Model\s*[\|\:]*\s*([A-Za-z0-9\s'’\-]+?)\s+[0-9.,]+\s*%/i,
+        /Model\s+([^<\n]+?)\s+[0-9.,]+\s*%/i,
+        /"model"\s*:\s*"([^"]+)"/i,
+      ];
+      for (const pattern of modelPatterns) {
+        const m = html.match(pattern);
+        if (m && m[1]) {
+          model = m[1].trim();
+          break;
         }
       }
 
@@ -109,7 +107,7 @@ class PortalsPriceService {
   /**
    * Get collection ID from Portals API by gift name
    */
-  async getCollectionId(giftName: string): Promise<number | null> {
+  async getCollectionId(giftName: string): Promise<string | null> {
     try {
       const response = await axios.get(`${PORTALS_API_URL}/collections`, {
         params: {
@@ -138,7 +136,7 @@ class PortalsPriceService {
   /**
    * Get floor price for a collection (optionally filtered by model)
    */
-  async getFloorPrice(collectionId: number, model?: string | null): Promise<FloorPriceData | null> {
+  async getFloorPrice(collectionId: string, model?: string | null): Promise<FloorPriceData | null> {
     try {
       const params: Record<string, string> = {
         offset: '0',
@@ -173,7 +171,7 @@ class PortalsPriceService {
 
       const item = results[0];
       const floorPrice: FloorPriceData = {
-        price: item.price ? parseFloat(item.price) : null,
+        price: item.price !== undefined && item.price !== null ? Number(item.price) : null,
         asset: item.asset || 'TON',
         portalId: item.id || null,
         collectionNumber: item.external_collection_number || null,

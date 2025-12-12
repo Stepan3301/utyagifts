@@ -71,7 +71,7 @@ export interface Database {
           floor_price: number | null // Floor price in TON
           floor_price_asset: string | null // Currency (default: TON)
           model: string | null // NFT model name
-          collection_id: number | null // Portals collection ID
+          collection_id: string | null // Portals collection ID (text/uuid from Portals)
           floor_price_updated_at: string | null // Last price update timestamp
           created_at: string
           updated_at: string
@@ -90,7 +90,7 @@ export interface Database {
           floor_price?: number | null
           floor_price_asset?: string | null
           model?: string | null
-          collection_id?: number | null
+          collection_id?: string | null
           floor_price_updated_at?: string | null
           created_at?: string
           updated_at?: string
@@ -109,7 +109,7 @@ export interface Database {
           floor_price?: number | null
           floor_price_asset?: string | null
           model?: string | null
-          collection_id?: number | null
+          collection_id?: string | null
           floor_price_updated_at?: string | null
           created_at?: string
           updated_at?: string

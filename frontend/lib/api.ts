@@ -229,7 +229,7 @@ export interface InventoryResponse {
     floor_price: number | null
     floor_price_asset: string | null
     model: string | null
-    collection_id: number | null
+    collection_id: string | null
     floor_price_updated_at: string | null
     created_at: string
     updated_at: string
@@ -251,7 +251,7 @@ export interface GiftResponse {
     floor_price: number | null
     floor_price_asset: string | null
     model: string | null
-    collection_id: number | null
+    collection_id: string | null
     floor_price_updated_at: string | null
     created_at: string
     updated_at: string

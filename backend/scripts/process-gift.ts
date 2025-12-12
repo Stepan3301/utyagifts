@@ -10,9 +10,11 @@ async function main() {
     process.exit(1)
   }
 
-  const gift =
-    (await giftRepository.findById(giftIdentifier)) ??
-    (await findGiftByUrl(giftIdentifier))
+  const looksLikeUuid = /^[0-9a-fA-F-]{36}$/.test(giftIdentifier)
+
+  const gift = looksLikeUuid
+    ? (await giftRepository.findById(giftIdentifier)) ?? (await findGiftByUrl(giftIdentifier))
+    : (await findGiftByUrl(giftIdentifier)) ?? (await giftRepository.findById(giftIdentifier))
 
   if (!gift || !gift.gift_url) {
     console.error('Gift not found or missing gift_url:', giftIdentifier)
