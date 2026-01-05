@@ -23,7 +23,7 @@ export const authController = {
         },
       });
     } catch (error) {
-      res.status(401).json({ error: 'Invalid initData' });
+      res.status(401).json({ error: 'Invalid initData ' });
     }
   },
 
