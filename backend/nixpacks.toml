@@ -3,18 +3,18 @@ nixPkgs = ["nodejs_20", "chromium"]
 
 [phases.install]
 cmds = [
-  "if [ -f package.json ] && [ ! -f package-lock.json ]; then cd backend 2>/dev/null || true; fi",
+  "cd backend",
   "npm install --no-optional"
 ]
 
 [phases.build]
 cmds = [
-  "if [ -f package.json ] && [ ! -f package-lock.json ]; then cd backend 2>/dev/null || true; fi",
+  "cd backend",
   "npm run build"
 ]
 
 [start]
-cmd = "if [ -f package.json ] && [ ! -f package-lock.json ]; then cd backend 2>/dev/null || true; fi && npm start"
+cmd = "cd backend && npm start"
 
 [variables]
 PUPPETEER_SKIP_CHROMIUM_DOWNLOAD = "true"
