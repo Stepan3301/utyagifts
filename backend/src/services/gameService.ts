@@ -1,7 +1,7 @@
 import { gameSessionRepository } from '../repositories/gameSessionRepository';
 import { giftService } from './giftService';
 import { poolService } from './poolService';
-import { gameWinLossService, type BetGift } from './gameWinLossService';
+import { gameWinLossService } from './gameWinLossService';
 import type { GameSession as DBGameSession } from '../lib/supabase';
 
 export interface GameSession {
@@ -143,11 +143,8 @@ class GameService {
 
     if (betGifts && betGifts.length > 0) {
       // Validate all bet gifts exist in user's inventory
-      const betGiftsWithPrices = await gameWinLossService.getBetGiftsWithPrices(
-        userId,
-        betGifts
-      );
       // Validation passed if no error thrown
+      await gameWinLossService.getBetGiftsWithPrices(userId, betGifts);
     } else if (giftId) {
       // Old behavior: single gift
       const gift = await giftService.getGiftById(giftId, userId);
@@ -307,7 +304,17 @@ class GameService {
 
     const options = await gameWinLossService.findMatchingGifts(newGiftPrice);
 
-    return { options, newGiftPrice };
+    // Normalize snake_case stored in inventory to camelCase for the API response
+    const normalizedOptions = options.map((gift) => ({
+      id: gift.id,
+      name: gift.name,
+      image: gift.image,
+      url: gift.url,
+      floorPrice: gift.floorPrice,
+      animationData: (gift as any).animation_data ?? null,
+    }));
+
+    return { options: normalizedOptions, newGiftPrice };
   }
 
   async getCurrentSession(userId: string): Promise<GameSession | null> {

@@ -8,10 +8,10 @@
     "backend"
   ],
   "scripts": {
-    "dev": "pnpm run --parallel dev",
-    "build": "pnpm run --recursive build",
-    "lint": "pnpm run --recursive lint",
-    "type-check": "pnpm run --recursive type-check"
+    "dev": "npm run --workspaces --if-present dev",
+    "build": "npm run --workspaces --if-present build",
+    "lint": "npm run --workspaces --if-present lint",
+    "type-check": "npm run --workspaces --if-present type-check"
   },
   "keywords": [
     "telegram",
@@ -23,8 +23,6 @@
   "author": "",
   "license": "MIT",
   "engines": {
-    "node": ">=20.0.0",
-    "pnpm": ">=8.0.0"
-  },
-  "packageManager": "pnpm@8.15.0"
+    "node": ">=20.0.0"
+  }
 }

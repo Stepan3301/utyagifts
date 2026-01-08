@@ -19,7 +19,8 @@ export interface WinGiftOption {
   image: string | null;
   url: string;
   floorPrice: number | null;
-  animationData: any | null;
+  // Keep snake_case to match the inventory JSON shape we store in the `users.inventory` column
+  animation_data: any | null;
 }
 
 class GameWinLossService {
@@ -187,7 +188,7 @@ class GameWinLossService {
           image: gift.image,
           url: gift.url,
           floorPrice,
-          animationData: gift.animation_data || giftFromTable?.animation_data || null,
+          animation_data: gift.animation_data || giftFromTable?.animation_data || null,
         });
       }
     }
@@ -233,7 +234,7 @@ class GameWinLossService {
       image: chosenGift.image,
       url: chosenGift.url,
       floorPrice: giftFromTable?.floor_price ? Number(giftFromTable.floor_price) : null,
-      animationData: chosenGift.animation_data || giftFromTable?.animation_data || null,
+      animation_data: chosenGift.animation_data || giftFromTable?.animation_data || null,
     };
 
     // Remove bet gifts from user's inventory
