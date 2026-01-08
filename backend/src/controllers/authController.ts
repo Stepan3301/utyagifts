@@ -44,7 +44,7 @@ export const authController = {
 
       if (!telegramId || typeof telegramId !== 'number') {
         console.warn('❌ Invalid telegramId:', telegramId);
-        res.status(400).json({ error: 'telegramId is required and must be a number' });
+        res.status(400).json({ error: 'telegramId is required and must be a number ' });
         return;
       }
 
