@@ -4,7 +4,7 @@ nixPkgs = ["nodejs_20", "chromium"]
 [phases.install]
 cmds = [
   "cd backend",
-  "npm ci"
+  "npm ci --include=dev --workspaces=false || npm install --include=dev --workspaces=false"
 ]
 
 [phases.build]
